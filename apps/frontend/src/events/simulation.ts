@@ -1,7 +1,11 @@
 import { sides } from '../config/participants.ts';
-import type { Store } from '../core/store.ts';
+type Target = {
+    dispatch(
+        event: { type: 'vote'; side: 'a' | 'b' } | { type: 'reset' },
+    ): void;
+};
 import type { Elements } from '../components/elements.ts';
-export function bindSimulation(elements: Elements, store: Store) {
+export function bindSimulation(elements: Elements, store: Target) {
     const cleanup: (() => void)[] = [];
     for (const side of sides) {
         const listener = () => store.dispatch({ type: 'vote', side });
