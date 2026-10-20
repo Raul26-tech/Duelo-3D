@@ -115,7 +115,18 @@ test('catálogo padrão vazio; valores configurados e lado único são autoridad
             .reason,
         'UNKNOWN_GIFT',
     );
-    for (const points of [5, 10, 20, 50, 100]) {
+    for (const points of [
+        1,
+        5,
+        7,
+        10,
+        20,
+        25,
+        50,
+        100,
+        200,
+        Number.MAX_SAFE_INTEGER,
+    ]) {
         const engine = createScoringEngine({
             ...options,
             catalog: [{ ...catalog[0], points }],
@@ -128,13 +139,57 @@ test('catálogo padrão vazio; valores configurados e lado único são autoridad
     assert.deepEqual(engine.snapshot().scores, { lula: 0, flavio: 100 });
 });
 
+test('pontos exigem inteiros positivos seguros sem coerção de tipos', () => {
+    for (const points of [
+        0,
+        -0,
+        -1,
+        -200,
+        0.5,
+        7.5,
+        NaN,
+        Infinity,
+        -Infinity,
+        Number.MAX_SAFE_INTEGER + 1,
+        '7',
+        '200',
+        '',
+        null,
+        undefined,
+        true,
+        false,
+        7n,
+        {},
+        [],
+        new Number(7),
+    ]) {
+        assert.throws(() => createGiftCatalog([{ ...catalog[0], points }]));
+    }
+});
+
+test('regra do catálogo é congelada e preserva pontos personalizados do servidor', () => {
+    const input = [{ ...catalog[0], points: 7 }];
+    const configured = createGiftCatalog(input);
+    const rule = configured.get('test-red')!;
+    assert.equal(Object.isFrozen(rule), true);
+    assert.equal(Reflect.set(rule, 'points', 200), false);
+    input[0].points = 200;
+    assert.equal(rule.points, 7);
+    const engine = createScoringEngine({ ...options, catalog: [rule] });
+    assert.equal(engine.process(gift()).points, 7);
+    assert.equal(
+        engine.process(gift('unknown', 'unknown')).reason,
+        'UNKNOWN_GIFT',
+    );
+    assert.deepEqual(engine.snapshot().scores, { lula: 7, flavio: 0 });
+});
+
 test('configurações inválidas, ambíguas ou duplicadas são recusadas', () => {
     for (const bad of [
         null,
         {},
         [{ ...catalog[0], candidate: ['lula', 'flavio'] }],
         [{ ...catalog[0], candidate: 'both' }],
-        [{ ...catalog[0], points: 7 }],
         [{ ...catalog[0], name: '' }],
         [{ ...catalog[0], giftId: Number.MAX_SAFE_INTEGER + 1 }],
         [catalog[0], catalog[0]],
@@ -369,6 +424,66 @@ test('limite inclui identidades e sequências; bloqueia novos sem descartar dedu
         'CAPACITY_REACHED',
     );
     assert.equal(combos.snapshot().scores.lula, 0);
+});
+
+test('combo aplica quantidade efetiva usando pontuação personalizada do catálogo', () => {
+    const engine = createScoringEngine({
+        ...options,
+        catalog: [{ ...catalog[0], points: 7 }],
+    });
+    engine.process(combo('pending-1', 1, false));
+    engine.process(combo('pending-3', 3, false));
+    assert.equal(engine.snapshot().scores.lula, 0);
+    assert.equal(engine.process(combo('final-3', 3, true)).points, 21);
+    assert.equal(
+        engine.process(combo('repeat-final', 3, true)).status,
+        'duplicate',
+    );
+    assert.deepEqual(engine.snapshot().scores, { lula: 21, flavio: 0 });
+    assert.equal(engine.snapshot().version, 1);
+});
+
+test('configuração máxima válida continua sujeita ao overflow na contabilização', () => {
+    const maximumCatalog = [{ ...catalog[0], points: Number.MAX_SAFE_INTEGER }];
+    const engine = createScoringEngine({ ...options, catalog: maximumCatalog });
+    assert.equal(
+        engine.process(gift('maximum')).points,
+        Number.MAX_SAFE_INTEGER,
+    );
+    const full = engine.snapshot();
+    for (const next of [
+        comment('red'),
+        comment('blue', 'Flavio'),
+        gift('another'),
+    ]) {
+        assert.equal(engine.process(next).reason, 'SCORE_LIMIT');
+        assert.deepEqual(engine.snapshot(), full);
+    }
+    assert.equal(engine.process(gift('maximum')).status, 'duplicate');
+
+    const combos = createScoringEngine({ ...options, catalog: maximumCatalog });
+    combos.process(combo('pending', 2, false));
+    const pending = combos.snapshot();
+    assert.equal(
+        combos.process(combo('overflow-final', 2, true)).reason,
+        'SCORE_LIMIT',
+    );
+    assert.deepEqual(combos.snapshot(), pending);
+    // Repeating an overflow must not commit points, identities or finalization.
+    assert.equal(
+        combos.process(combo('overflow-final', 2, true)).reason,
+        'SCORE_LIMIT',
+    );
+    assert.deepEqual(combos.snapshot(), pending);
+
+    const nonempty = createScoringEngine({
+        ...options,
+        catalog: maximumCatalog,
+    });
+    nonempty.process(comment());
+    const before = nonempty.snapshot();
+    assert.equal(nonempty.process(gift('too-large')).reason, 'SCORE_LIMIT');
+    assert.deepEqual(nonempty.snapshot(), before);
 });
 
 test('overflow é rejeitado atomicamente sem registrar finalização parcial', () => {

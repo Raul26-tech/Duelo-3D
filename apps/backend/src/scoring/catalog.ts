@@ -23,7 +23,9 @@ export function createGiftCatalog(
             entry.name.trim().length === 0 ||
             entry.name.length > 256 ||
             (entry.candidate !== 'lula' && entry.candidate !== 'flavio') ||
-            ![5, 10, 20, 50, 100].includes(entry.points as number) ||
+            typeof entry.points !== 'number' ||
+            !Number.isSafeInteger(entry.points) ||
+            entry.points <= 0 ||
             catalog.has(giftId)
         )
             throw new Error('Invalid or duplicate gift rule');

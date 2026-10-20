@@ -28,7 +28,7 @@ export type GiftRule = Readonly<{
     giftId: string;
     name: string;
     candidate: Candidate;
-    points: 5 | 10 | 20 | 50 | 100;
+    points: number;
 }>;
 export type Snapshot = Readonly<{
     sessionId: string;
