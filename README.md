@@ -1,100 +1,69 @@
-# Duelo 3D — monorepo
+# Duelo 3D — simulação local em tempo real
 
-Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa. Frontend e backend são independentes: a votação continua simulada no navegador, e o backend oferece somente GET /health.
+Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa.
 
-## Organização
+O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP e WebSocket). O backend é a única autoridade da simulação: os botões enviam comandos e a arena atualiza somente quando recebe estado do servidor. Não há TikTok, comentários, presentes, persistência ou disputa real.
 
-- `apps/frontend`: Vite, TypeScript, HTML/CSS, animações WebM e testes.
-- `apps/backend`: HTTP nativo Node.js, TypeScript ESM e testes.
-- `scripts/dev.mjs`: inicia os dois serviços e encerra seus processos filhos.
-- `docs/`: decisões e validação; `docs/historico/` preserva documentos antigos.
-- `.env.example`: único exemplo de configuração do monorepo.
-- `package.json` e `package-lock.json`: npm workspaces e lockfile único.
+## Executar juntos
 
-## Requisitos e instalação
-
-Node **24.15.0 ou superior dentro da linha 24** (`^24.15.0`) e npm 11+.
-O requisito acompanha as dependências existentes, sem atualizar suas versões.
+Node >=24.15.0 dentro da linha 24 e npm 11+.
 
 ```bash
-# Se usar nvm:
-nvm install
-nvm use
 npm ci
 npm run dev
 ```
 
-A criação de .env não é necessária. Sem o arquivo, os dois serviços usam seus padrões.
+O .env na raiz é opcional; veja .env.example. Os padrões são FRONTEND_PORT=5173, BACKEND_PORT=3000 e BACKEND_HOST=127.0.0.1.
 
-## Um único arquivo de ambiente
+1. Abra http://127.0.0.1:5173.
+2. Copie a chave temporária exibida no terminal do backend.
+3. Clique em Autorizar simulação e cole a chave.
+4. Use os botões existentes. Outras abas autorizadas recebem o mesmo placar.
+5. Ctrl+C encerra os serviços no Ubuntu.
 
-Opcionalmente, crie `.env` na **raiz do repositório**, usando `.env.example`:
+O entrypoint dev habilita explicitamente a simulação local, salvo SIMULATION_MODE=false. Fora de NODE_ENV=development, ela permanece desabilitada. npm start --workspace backend não habilita simulação por padrão.
 
-```dotenv
-FRONTEND_PORT=5173
-BACKEND_PORT=3000
-BACKEND_HOST=127.0.0.1
-```
-
-Não mantenha configuração em arquivos .env por workspace. As aplicações não os leem. A migração não apaga arquivos locais; se já existirem, transfira os valores desejados para a raiz por conta própria. O antigo PORT foi substituído por BACKEND_PORT e não é usado como fallback.
-
-Somente o exemplo da raiz é versionado. .env e suas variantes locais continuam ignorados pelo Git. Não sobrescreva um .env existente ao copiar exemplos.
-
-As variáveis do terminal têm prioridade:
+Pode-se configurar SIMULATION_TOKEN no .env central, sem prefixo VITE_. Ela não é exposta pelo Vite nem enviada na URL; o operador informa a chave à aba, que a mantém apenas em memória. Variáveis do terminal têm prioridade. Não publique o .env.
 
 ```bash
+SIMULATION_MODE=false npm run dev
 FRONTEND_PORT=5200 BACKEND_PORT=3001 npm run dev
 ```
 
-O backend encontra o arquivo pela localização de seu módulo (tanto src quanto dist), carrega-o com process.loadEnvFile e ignora somente ENOENT. Não passa um arquivo inexistente ao watcher e não depende do diretório atual. Alterações no .env do backend exigem reiniciar o processo.
+Use a URL 127.0.0.1 na porta do frontend. Origin, chave e modo são validados; acesso à porta local sozinho não autoriza comandos. Frontend mantém strictPort: uma porta ocupada causa erro.
 
-O Vite fixa root no frontend e envDir na raiz do monorepo e usa loadEnv para a configuração do servidor. Nenhum .env dentro de apps é carregado. A convenção de modos do Vite continua disponível na raiz; para manter a mesma configuração nos dois serviços, utilize apenas o .env central, pois o backend não carrega variantes por modo.
-
-FRONTEND_PORT e BACKEND_PORT devem ser inteiros entre 1 e 65535. O frontend usa strictPort e host 127.0.0.1: uma porta ocupada gera erro, sem escolher 5174/5175. BACKEND_HOST aceita somente os literais 127.0.0.1 e ::1; vazio, localhost, 0.0.0.0, ::, endereços de rede e nomes externos são rejeitados para impedir exposição acidental.
-
-Os endereços padrão são http://127.0.0.1:5173 e http://127.0.0.1:3000/health. O preview do frontend permanece na porta 4173; FRONTEND_PORT controla somente o dev.
-
-Variáveis privadas, inclusive futuras credenciais TikTok, destinam-se exclusivamente ao backend. Não use prefixo VITE_ em segredos. envPrefix não foi ampliado e o arquivo central não é publicado como asset do frontend. FRONTEND_PORT não é inserida no bundle.
-
-## Comandos na raiz
+## Build, testes e execução individual
 
 ```bash
-npm run dev
 npm run build
 npm test
 npm run check:media
 npm run format:check
-```
 
-Ctrl+C no dev conjunto encerra os grupos de processos no Ubuntu. O build gera apps/frontend/dist e apps/backend/dist.
-
-## Executar cada workspace
-
-Na raiz:
-
-```bash
 npm run dev:frontend
 npm run dev:backend
-npm run preview --workspace frontend
+
+# Após build: HTTP técnico, sem habilitar simulação por padrão
 npm start --workspace backend
-```
-
-Dentro de apps/frontend ou apps/backend, `npm run dev`, `npm run build` e `npm test` também usam a configuração central. Para produção local do backend, execute o build antes de npm start.
-
-```bash
 curl --fail http://127.0.0.1:3000/health
 ```
 
-Resposta: `{"status":"ok","service":"duelo-3d-backend"}`.
+npm run build gera apps/frontend/dist e apps/backend/dist. Preview continua disponível, mas o proxy/origem de simulação é configurado para o Vite dev nesta fase. Não há deploy.
 
-## Formatação e testes
+Prettier 3.9.10 permanece na raiz; npm run format altera os arquivos ativos. Documentos históricos e vídeos permanecem excluídos da formatação.
 
-Prettier 3.9.10 permanece como devDependency da raiz. `npm run format` aplica formatação e `npm run format:check` apenas verifica. Documentos arquivados em docs/historico e os vídeos ficam fora da formatação. HTML/CSS não foram redesenhados. Ajustes de recuo em TypeScript não alteram regras de votação.
+## Estado, reconexão e limites
 
-Os testes cobrem placar, DOM, integridade dos seis WebM, porta ocupada, configuração central independente do cwd, prioridade do terminal, host seguro e backend em --watch com/sem .env. Os subprocessos de teste usam NO_COLOR=1 e removem FORCE_COLOR para evitar saídas ANSI.
+Sessão e placar são exclusivamente em memória. Reiniciar o backend reinicia a sessão e, sem token fixo, gera outra chave.
 
-A versão atual prevê 21 cenários (14 frontend e 7 backend); isso é contagem esperada, não um resultado de execução. Nesta sessão o executor está indisponível: npm ci, build, testes, mídia por HTTP, Prettier e dev não puderam ser executados. Veja docs/validacao-monorepo.md.
+Votos são sempre +1, validados e deduplicados pelo servidor. Reset é autorizado e não limpa identidades já aplicadas. A sessão aceita até 4096 comandos distintos e rejeita novos quando atinge o limite; não reaplica comandos descartados de cache.
 
-## Limitações e próximas fases
+A conexão usa snapshot, versão monotônica, descarte de sockets/sessões antigas e reconexão automática com backoff até 8 s. Votos de resultado incerto não são reenviados. Enquanto desconectado, o último placar pode permanecer visível, claramente indicado como possivelmente desatualizado; não há pontuação offline.
 
-Sem integração TikTok LIVE, comentários, presentes, WebSocket, persistência, autenticação, Docker ou deploy. Backend não processa votos e frontend não o consulta. Qualquer integração ou refatoração interna posterior depende de novo escopo.
+Arquitetura, contratos, limites, exemplos e segurança: [docs/realtime-simulation.md](docs/realtime-simulation.md).
+
+## Validação desta entrega
+
+HTML, CSS, seis vídeos e os módulos de renderização/animação foram preservados. Os cenários anteriores continuam presentes; total esperado após novas verificações: 38.
+
+Não há executor utilizável nesta sessão. Instalação, compilação, testes Node, formatação, serviços HTTP/WS, navegador e Ctrl+C não foram executados. As verificações isoladas do redutor em JavaScript não substituem esses comandos. As novas dependências/entradas do lock também precisam da confirmação de npm ci. O PR deve ser validado localmente antes do merge.

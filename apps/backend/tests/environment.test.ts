@@ -38,7 +38,7 @@ function childEnv(values: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     for (const key of ['FORCE_COLOR', 'PORT', 'BACKEND_PORT', 'BACKEND_HOST']) {
         delete env[key];
     }
-    return { ...env, ...values, NO_COLOR: '1' };
+    return { ...env, NODE_ENV: 'test', SIMULATION_MODE: 'false', ...values, NO_COLOR: '1' };
 }
 
 function probe(moduleDir: string, cwd: string, values: NodeJS.ProcessEnv = {}) {

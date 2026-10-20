@@ -41,11 +41,10 @@ test('sem .env central, preserva defaults, base, strictPort e diretórios', () =
             config.envDir,
             fileURLToPath(new URL('../../', dirs.configUrl)),
         );
-        assert.deepEqual(config.server, {
-            host: '127.0.0.1',
-            strictPort: true,
-            port: 5173,
-        });
+        assert.equal(config.server?.host, '127.0.0.1');
+        assert.equal(config.server?.strictPort, true);
+        assert.equal(config.server?.port, 5173);
+        assert.ok(config.server?.proxy?.['/realtime']);
         assert.equal(config.envPrefix, undefined);
         assert.equal(config.define, undefined);
     } finally {
