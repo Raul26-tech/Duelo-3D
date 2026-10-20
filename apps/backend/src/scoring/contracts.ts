@@ -44,3 +44,24 @@ export type Decision = Readonly<{
     points: number;
     state: Snapshot;
 }>;
+
+/** Library-neutral, complete state for verification by a persistence coordinator. */
+export type EngineConfiguration = Readonly<{
+    origin: string;
+    roomId: string;
+    domain: Domain;
+    capacity: number;
+    catalog: readonly GiftRule[];
+}>;
+export type EngineCheckpoint = Readonly<{
+    configuration: EngineConfiguration;
+    state: Snapshot;
+    events: readonly Readonly<{ identity: string; fingerprint: string }>[];
+    sequences: readonly Readonly<{
+        identity: string;
+        giftId: string;
+        quantity: number;
+        final: boolean;
+        invalid: boolean;
+    }>[];
+}>;

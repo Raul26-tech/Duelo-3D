@@ -2,7 +2,7 @@
 
 Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa.
 
-O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP e WebSocket). O backend é a única autoridade da simulação: os botões enviam comandos e a arena atualiza somente quando recebe estado do servidor. Não há ingestão TikTok, persistência ou disputa real. A Fase 3 acrescenta um motor interno e testável de comentários/presentes, independente do transporte e ainda sem entrada externa ou ligação com a arena.
+O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP e WebSocket). O backend é a única autoridade da simulação: os botões enviam comandos e a arena atualiza somente quando recebe estado do servidor. Não há ingestão TikTok ou disputa real. A Fase 4 oferece persistência SQLite optativa para o motor interno, sem conectar esse armazenamento à arena. A Fase 3 acrescenta um motor interno e testável de comentários/presentes, independente do transporte e ainda sem entrada externa ou ligação com a arena.
 
 ## Executar juntos
 
@@ -54,7 +54,7 @@ Prettier 3.9.10 permanece na raiz; npm run format altera os arquivos ativos. Doc
 
 ## Estado, reconexão e limites
 
-Sessão e placar são exclusivamente em memória. Reiniciar o backend reinicia a sessão e, sem token fixo, gera outra chave.
+Na simulação WebSocket experimental, sessão e placar continuam exclusivamente em memória. Reiniciar o backend reinicia a sessão e, sem token fixo, gera outra chave.
 
 Votos são sempre +1, validados e deduplicados pelo servidor. Reset é autorizado e não limpa identidades já aplicadas. A sessão aceita até 4096 comandos distintos e rejeita novos quando atinge o limite; não reaplica comandos descartados de cache.
 
@@ -73,3 +73,11 @@ Contratos, limites, política de finalização de combos e exemplos: [docs/scori
 ## Validação da Fase 3
 
 Veja [docs/validacao-scoring-engine.md](docs/validacao-scoring-engine.md) para os comandos executados e suas limitações. Os 38 testes existentes foram preservados; o motor acrescenta testes unitários e de integridade. HTML, CSS, transporte, animações e seis WebM não são alterados por esta fase.
+
+## Persistência transacional — Fase 4
+
+`apps/backend/src/persistence` acrescenta armazenamento SQLite local ao motor de regras. Cada processamento usa transação, recuperação pelo mesmo motor e verificação integral antes de devolver o estado comitado. Identidades, fingerprints, combos, sessão, placar e versão são persistidos juntos. Dados ausentes/inconsistentes bloqueiam a retomada.
+
+Biblioteca: better-sqlite3 12.10.1, validada com Node 24.15.0. O banco padrão fica em `~/.local/state/duelo-3d/scoring.sqlite`, fora do repositório; criação e retomada são operações explícitas da API interna. `npm run dev` continua iniciando a simulação existente sem criar banco.
+
+Arquitetura, esquema, exemplo e recuperação: [docs/scoring-persistence.md](docs/scoring-persistence.md). Resultados e limitações: [docs/validacao-scoring-persistence.md](docs/validacao-scoring-persistence.md).
