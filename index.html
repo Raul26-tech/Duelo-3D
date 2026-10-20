@@ -1,61 +1,164 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Duelo 3D Live</title>
-  </head>
-  <body>
-    <header><strong>DUELO 3D LIVE</strong><span>PLACAR DE VOTOS</span></header>
-    <main>
-      <section class="intro">
-        <h1>A arena está pronta para o duelo!</h1>
-        <p>
-          Use os botões para simular os votos. Os personagens reagem conforme o
-          placar.
-        </p>
-      </section>
-      <section class="arena">
-        <div class="arena-top">
-          <span class="pill red-pill">🔴 LADO A</span
-          ><span class="live"><i></i> ARENA AO VIVO</span
-          ><span class="pill blue-pill">🔵 LADO B</span>
-        </div>
-        <div class="fighters">
-          <article class="fighter red-side" id="fighter-a">
-            <div class="score" id="score-a">0</div>
-            <video id="video-a" autoplay muted loop playsinline preload="auto">
-              <source src="/videos/lula-feliz.webm" type="video/webm" />
-            </video>
-            <h2>LULA</h2>
-            <span class="status" id="status-a">PRONTO PARA O DUELO</span>
-          </article>
-          <div class="versus">VS</div>
-          <article class="fighter blue-side" id="fighter-b">
-            <div class="score" id="score-b">0</div>
-            <video id="video-b" autoplay muted loop playsinline preload="auto">
-              <source src="/videos/flavio-feliz.webm" type="video/webm" />
-            </video>
-            <h2>FLÁVIO</h2>
-            <span class="status" id="status-b">PRONTO PARA O DUELO</span>
-          </article>
-        </div>
-        <div class="bar">
-          <div id="bar-a"></div>
-          <div id="bar-b"></div>
-        </div>
-      </section>
-      <section class="buttons">
-        <button class="vote-a" id="vote-a">🔴 Voto no Lula +1</button>
-        <button class="vote-b" id="vote-b">🔵 Voto no Flávio +1</button>
-        <button class="reset" id="reset">↻ Zerar placar</button>
-      </section>
-      <p class="note">
-        Enquete informal de entretenimento, sem vínculo com votação eleitoral
-        oficial ou pesquisa representativa. Votos simulados localmente; sem
-        conexão com TikTok LIVE.
-      </p>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <meta name="theme-color" content="#080c18" />
+        <title>Duelo 3D Live</title>
+    </head>
+    <body>
+        <header>
+            <a class="brand" href="./">DUELO <span>3D</span> LIVE</a
+            ><span class="live"><i></i> ARENA DE VOTOS</span>
+        </header>
+        <main>
+            <section class="intro">
+                <p class="eyebrow">DOIS LADOS. UMA ARENA.</p>
+                <h1>Cada voto muda o duelo.</h1>
+                <p>Escolha seu lado e veja os personagens reagirem.</p>
+            </section>
+            <section class="arena" aria-label="Arena do duelo">
+                <div class="rig" aria-hidden="true"></div>
+                <div class="arena-title" aria-hidden="true">
+                    <span>DUELO</span><strong>3D</strong><em>LIVE</em>
+                </div>
+                <div class="fighters">
+                    <article
+                        class="fighter red-side"
+                        id="fighter-a"
+                        aria-labelledby="name-a"
+                    >
+                        <div class="scoreboard">
+                            <h2 id="name-a">LULA</h2>
+                            <div
+                                class="score"
+                                id="score-a"
+                                aria-label="Votos de Lula"
+                            >
+                                0
+                            </div>
+                            <div class="bar" aria-hidden="true">
+                                <div id="bar-a"></div>
+                            </div>
+                        </div>
+                        <div class="stage">
+                            <div
+                                class="contact-shadow"
+                                aria-hidden="true"
+                            ></div>
+                            <video
+                                id="video-a"
+                                aria-label="Personagem animado de Lula"
+                                autoplay
+                                muted
+                                loop
+                                playsinline
+                                preload="auto"
+                            >
+                                <source
+                                    src="/videos/lula-feliz.webm"
+                                    type="video/webm"
+                                />
+                            </video>
+                            <div class="platform" aria-hidden="true">
+                                <div class="platform-top"></div>
+                                <div class="platform-front"><span>★</span></div>
+                            </div>
+                        </div>
+                        <div class="status-panel">
+                            <span class="status-icon" aria-hidden="true">◆</span
+                            ><span class="status" id="status-a" role="status"
+                                >EMPATE</span
+                            >
+                        </div>
+                    </article>
+                    <div class="versus" aria-hidden="true">VS</div>
+                    <article
+                        class="fighter blue-side"
+                        id="fighter-b"
+                        aria-labelledby="name-b"
+                    >
+                        <div class="scoreboard">
+                            <h2 id="name-b">FLÁVIO</h2>
+                            <div
+                                class="score"
+                                id="score-b"
+                                aria-label="Votos de Flávio"
+                            >
+                                0
+                            </div>
+                            <div class="bar" aria-hidden="true">
+                                <div id="bar-b"></div>
+                            </div>
+                        </div>
+                        <div class="stage">
+                            <div
+                                class="contact-shadow"
+                                aria-hidden="true"
+                            ></div>
+                            <video
+                                id="video-b"
+                                aria-label="Personagem animado de Flávio"
+                                autoplay
+                                muted
+                                loop
+                                playsinline
+                                preload="auto"
+                            >
+                                <source
+                                    src="/videos/flavio-feliz.webm"
+                                    type="video/webm"
+                                />
+                            </video>
+                            <div class="platform" aria-hidden="true">
+                                <div class="platform-top"></div>
+                                <div class="platform-front"><span>◆</span></div>
+                            </div>
+                        </div>
+                        <div class="status-panel">
+                            <span class="status-icon" aria-hidden="true">◆</span
+                            ><span class="status" id="status-b" role="status"
+                                >EMPATE</span
+                            >
+                        </div>
+                    </article>
+                </div>
+                <section class="buttons" aria-label="Controles de votação">
+                    <button
+                        class="vote-a"
+                        id="vote-a"
+                        aria-label="Votar em Lula, mais um voto"
+                    >
+                        <span class="vote-icon" aria-hidden="true">♥</span
+                        ><span
+                            >VOTO NO LULA<small
+                                >+1 voto <span>· Faça a diferença</span></small
+                            ></span
+                        ><span class="button-arrow" aria-hidden="true">↗</span>
+                    </button>
+                    <button
+                        class="vote-b"
+                        id="vote-b"
+                        aria-label="Votar em Flávio, mais um voto"
+                    >
+                        <span class="vote-icon" aria-hidden="true">♥</span
+                        ><span
+                            >VOTO NO FLÁVIO<small
+                                >+1 voto <span>· Faça a diferença</span></small
+                            ></span
+                        ><span class="button-arrow" aria-hidden="true">↗</span>
+                    </button>
+                    <button class="reset" id="reset">
+                        <span aria-hidden="true">↻</span> Zerar placar
+                    </button>
+                </section>
+            </section>
+            <p class="note">
+                Enquete informal de entretenimento, sem vínculo com votação
+                eleitoral oficial ou pesquisa representativa. Votos simulados
+                localmente; sem conexão com TikTok LIVE.
+            </p>
+        </main>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
 </html>

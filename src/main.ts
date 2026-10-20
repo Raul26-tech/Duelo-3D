@@ -9,6 +9,7 @@ import {
     sides,
     type AnimationState,
 } from './config/participants.ts';
+
 const elements = getElements(document);
 const store = createStore();
 const animations = createAnimations(
