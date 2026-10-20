@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Duelo 3D Live</title>
+  </head>
+  <body>
+    <header><strong>DUELO 3D LIVE</strong><span>PLACAR DE VOTOS</span></header>
+    <main>
+      <section class="intro">
+        <h1>A arena está pronta para o duelo!</h1>
+        <p>
+          Use os botões para simular os votos. Os personagens reagem conforme o
+          placar.
+        </p>
+      </section>
+      <section class="arena">
+        <div class="arena-top">
+          <span class="pill red-pill">🔴 LADO A</span
+          ><span class="live"><i></i> ARENA AO VIVO</span
+          ><span class="pill blue-pill">🔵 LADO B</span>
+        </div>
+        <div class="fighters">
+          <article class="fighter red-side" id="fighter-a">
+            <div class="score" id="score-a">0</div>
+            <video id="video-a" autoplay muted loop playsinline preload="auto">
+              <source src="/videos/lula-feliz.webm" type="video/webm" />
+            </video>
+            <h2>LULA</h2>
+            <span class="status" id="status-a">PRONTO PARA O DUELO</span>
+          </article>
+          <div class="versus">VS</div>
+          <article class="fighter blue-side" id="fighter-b">
+            <div class="score" id="score-b">0</div>
+            <video id="video-b" autoplay muted loop playsinline preload="auto">
+              <source src="/videos/flavio-feliz.webm" type="video/webm" />
+            </video>
+            <h2>FLÁVIO</h2>
+            <span class="status" id="status-b">PRONTO PARA O DUELO</span>
+          </article>
+        </div>
+        <div class="bar">
+          <div id="bar-a"></div>
+          <div id="bar-b"></div>
+        </div>
+      </section>
+      <section class="buttons">
+        <button class="vote-a" id="vote-a">🔴 Voto no Lula +1</button>
+        <button class="vote-b" id="vote-b">🔵 Voto no Flávio +1</button>
+        <button class="reset" id="reset">↻ Zerar placar</button>
+      </section>
+      <p class="note">
+        Enquete informal de entretenimento, sem vínculo com votação eleitoral
+        oficial ou pesquisa representativa. Votos simulados localmente; sem
+        conexão com TikTok LIVE.
+      </p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
