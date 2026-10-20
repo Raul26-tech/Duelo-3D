@@ -1,0 +1,26 @@
+{
+  "public/videos/flavio-feliz.webm": {
+    "bytes": 7387321,
+    "sha256": "6e2cf49b7ab86aed435cd3859e6e17e8e3e4427ee3c2972419b55218f65c5a4a"
+  },
+  "public/videos/flavio-pulando.webm": {
+    "bytes": 7375724,
+    "sha256": "cbb7812a7d76871aceb08de3d37cc5a8b958859b2eedd8f3aa60d4621a397344"
+  },
+  "public/videos/flavio-triste.webm": {
+    "bytes": 6205774,
+    "sha256": "b6dc29dc69ff605d2f32e127fc1b91f577a1f2b955eb5debff8f0bae621cf4c4"
+  },
+  "public/videos/lula-feliz.webm": {
+    "bytes": 7394766,
+    "sha256": "f5ec5896a0eed3b6b41cf205255632419b14c5100d97e353faf48e84d1cd302f"
+  },
+  "public/videos/lula-pulando.webm": {
+    "bytes": 6776912,
+    "sha256": "3a73ada77e0aca9616a2b96f7c7cd94fa208c731a11032dd6ec5c73e5dec784e"
+  },
+  "public/videos/lula-triste.webm": {
+    "bytes": 7571982,
+    "sha256": "84eac454368e889a9a1cc8a55f90881682be41a8ff1563fa9efce74b2d521999"
+  }
+}
