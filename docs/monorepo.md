@@ -27,7 +27,7 @@ O manifesto de mídia estava obsoleto: os seis tamanhos nele registrados divergi
 | .gitignore e .prettierrc.json | Raiz | Preservados sem edição |
 | .prettierignore | Raiz | Caminho dos vídeos adaptado |
 
-Novos arquivos: backend/package.json, src/main.ts, src/server.ts, tests/health.test.ts, tsconfig.json, tsconfig.test.json e .env.example sob apps/; scripts/dev.mjs; README e documentação do monorepo.
+A fundação adicionou o backend HTTP, testes e configurações sob apps/backend, scripts/dev.mjs e a documentação do monorepo. A configuração de ambiente foi posteriormente centralizada em /.env.example; os exemplos por workspace foram removidos, conforme correcoes-configuracao.md.
 
 ## Decisões
 
@@ -35,8 +35,8 @@ Novos arquivos: backend/package.json, src/main.ts, src/server.ts, tests/health.t
 - Dependências específicas declaradas no workspace consumidor. TypeScript/@types/node do backend têm as mesmas versões já presentes no frontend, permitindo o hoist pelo npm sem novas resoluções.
 - Prettier é ferramenta do repositório e fica na raiz.
 - Backend em ESM, HTTP nativo do Node e host fixo 127.0.0.1. Somente GET /health retorna 200; rotas/métodos restantes retornam 404.
-- Dev usa execução TypeScript nativa do Node 24; build usa NodeNext e rewriteRelativeImportExtensions para produzir imports .js em dist.
-- Porta configurável por PORT validada antes de listen. .env é opcional e ignorado.
+- Dev usa execução TypeScript nativa do Node >=24.15.0 na linha 24; build usa NodeNext e rewriteRelativeImportExtensions para produzir imports .js em dist.
+- BACKEND_PORT e BACKEND_HOST são validados antes de listen; frontend usa FRONTEND_PORT. Ambos localizam o .env opcional na raiz por caminhos de módulo, sem depender do cwd. Veja correcoes-configuracao.md para os detalhes atuais.
 - O teste HTTP usa porta efêmera no loopback para evitar conflito com a porta 3000.
 - Orquestração local via child_process, sem pacote adicional. Ctrl+C/terminação encerram os grupos de processos no Ubuntu; uma saída inesperada encerra o conjunto.
 - Eventos, regras e animações do frontend não dependem do novo backend.

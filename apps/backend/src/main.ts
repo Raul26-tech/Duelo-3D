@@ -1,15 +1,16 @@
-import { createBackendServer, resolvePort } from './server.ts';
+import { createBackendServer, getBackendConfig } from './server.ts';
 import { loadOptionalEnv } from './environment.ts';
 
 loadOptionalEnv();
-const port = resolvePort(process.env.PORT);
+const { port, host } = getBackendConfig();
 const server = createBackendServer();
 server.on('error', (error) => {
     console.error('Falha ao iniciar backend:', error.message);
     process.exitCode = 1;
 });
-server.listen(port, '127.0.0.1', () => {
-    console.log(`Backend: http://127.0.0.1:${port}/health`);
+server.listen(port, host, () => {
+    const address = host === '::1' ? '[::1]' : host;
+    console.log(`Backend: http://${address}:${port}/health`);
 });
 let stopping = false;
 function stop() {

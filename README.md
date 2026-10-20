@@ -1,79 +1,85 @@
 # Duelo 3D — monorepo
 
-Enquete informal de entretenimento entre Lula e Flávio Bolsonaro, sem vínculo com votação eleitoral oficial ou pesquisa representativa. O frontend mantém a votação simulada em memória e o layout publicado na main. O backend oferece somente um health check técnico; ele não recebe nem processa votos.
+Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa. Frontend e backend são independentes: a votação continua simulada no navegador, e o backend oferece somente GET /health.
 
-## Estrutura e responsabilidades
+## Organização
 
-```text
-apps/
-  frontend/    Vite, interface, regras atuais, testes e seis WebM
-  backend/     HTTP nativo Node, TypeScript ESM e teste de saúde
-scripts/
-  dev.mjs      Inicia os dois workspaces sem dependências adicionais
-docs/
-  monorepo.md  Decisões, diagnóstico e relação das movimentações
-  validacao-monorepo.md
-  PUBLICAR-UBUNTU.md
-  historico/   Documentos preservados das fases anteriores
-package.json
-package-lock.json
-```
+- `apps/frontend`: Vite, TypeScript, HTML/CSS, animações WebM e testes.
+- `apps/backend`: HTTP nativo Node.js, TypeScript ESM e testes.
+- `scripts/dev.mjs`: inicia os dois serviços e encerra seus processos filhos.
+- `docs/`: decisões e validação; `docs/historico/` preserva documentos antigos.
+- `.env.example`: único exemplo de configuração do monorepo.
+- `package.json` e `package-lock.json`: npm workspaces e lockfile único.
 
-Há dois npm workspaces: `frontend` e `backend`. A instalação usa exclusivamente o lockfile da raiz; não execute uma instalação independente dentro de cada aplicação. Dependências de frontend e backend são declaradas em seus respectivos manifests; Prettier permanece na raiz como ferramenta do repositório.
+## Requisitos e instalação
 
-## Requisitos
-
-- Node.js **24.15.0 ou superior dentro da linha 24** (`^24.15.0` nos manifests).
-- Com nvm instalado: `nvm install` e `nvm use`, a partir do `.nvmrc` da raiz.
-- npm **11 ou superior**, com suporte a workspaces.
-- Acesso ao registro npm durante a instalação.
-
-O Node 24.13.1 fica abaixo dos requisitos efetivos de jsdom 30.1.3, @asamuzakjp/css-color 7.1.7, @asamuzakjp/dom-selector 10.0.4 e w3c-xmlserializer 6.0.0 (`^24.15.0` na linha 24). As versões exatas de Vite, TypeScript e demais pacotes já publicados foram preservadas. Não há Express, Fastify, Nx ou Turborepo.
-
-## Instalação e comandos na raiz
+Node **24.15.0 ou superior dentro da linha 24** (`^24.15.0`) e npm 11+.
+O requisito acompanha as dependências existentes, sem atualizar suas versões.
 
 ```bash
+# Se usar nvm:
+nvm install
+nvm use
 npm ci
 npm run dev
 ```
 
-Endereços locais padrão:
+A criação de .env não é necessária. Sem o arquivo, os dois serviços usam seus padrões.
 
-| Aplicação | Endereço |
-| --- | --- |
-| Frontend Vite | http://127.0.0.1:5173 |
-| Backend | http://127.0.0.1:3000/health |
-| Preview do frontend após build | http://127.0.0.1:4173 |
+## Um único arquivo de ambiente
 
-Use Ctrl+C no terminal de desenvolvimento para encerrar o conjunto. O script usa grupos de processos no Ubuntu para encerrar também os processos filhos. Uma saída inesperada de um workspace encerra o outro.
+Opcionalmente, crie `.env` na **raiz do repositório**, usando `.env.example`:
+
+```dotenv
+FRONTEND_PORT=5173
+BACKEND_PORT=3000
+BACKEND_HOST=127.0.0.1
+```
+
+Não mantenha configuração em arquivos .env por workspace. As aplicações não os leem. A migração não apaga arquivos locais; se já existirem, transfira os valores desejados para a raiz por conta própria. O antigo PORT foi substituído por BACKEND_PORT e não é usado como fallback.
+
+Somente o exemplo da raiz é versionado. .env e suas variantes locais continuam ignorados pelo Git. Não sobrescreva um .env existente ao copiar exemplos.
+
+As variáveis do terminal têm prioridade:
 
 ```bash
+FRONTEND_PORT=5200 BACKEND_PORT=3001 npm run dev
+```
+
+O backend encontra o arquivo pela localização de seu módulo (tanto src quanto dist), carrega-o com process.loadEnvFile e ignora somente ENOENT. Não passa um arquivo inexistente ao watcher e não depende do diretório atual. Alterações no .env do backend exigem reiniciar o processo.
+
+O Vite fixa root no frontend e envDir na raiz do monorepo e usa loadEnv para a configuração do servidor. Nenhum .env dentro de apps é carregado. A convenção de modos do Vite continua disponível na raiz; para manter a mesma configuração nos dois serviços, utilize apenas o .env central, pois o backend não carrega variantes por modo.
+
+FRONTEND_PORT e BACKEND_PORT devem ser inteiros entre 1 e 65535. O frontend usa strictPort e host 127.0.0.1: uma porta ocupada gera erro, sem escolher 5174/5175. BACKEND_HOST aceita somente os literais 127.0.0.1 e ::1; vazio, localhost, 0.0.0.0, ::, endereços de rede e nomes externos são rejeitados para impedir exposição acidental.
+
+Os endereços padrão são http://127.0.0.1:5173 e http://127.0.0.1:3000/health. O preview do frontend permanece na porta 4173; FRONTEND_PORT controla somente o dev.
+
+Variáveis privadas, inclusive futuras credenciais TikTok, destinam-se exclusivamente ao backend. Não use prefixo VITE_ em segredos. envPrefix não foi ampliado e o arquivo central não é publicado como asset do frontend. FRONTEND_PORT não é inserida no bundle.
+
+## Comandos na raiz
+
+```bash
+npm run dev
 npm run build
 npm test
 npm run check:media
+npm run format:check
 ```
 
-O build verifica tipos e gera `apps/frontend/dist/` e `apps/backend/dist/`. No backend, os testes também passam por checagem de tipos. Os dez cenários existentes (nove frontend e um health check) foram mantidos. Foram acrescentados sete testes de configuração: quatro no frontend e três no backend, totalizando 17 cenários esperados. Consulte o relatório de validação antes de interpretar isso como resultado de execução.
+Ctrl+C no dev conjunto encerra os grupos de processos no Ubuntu. O build gera apps/frontend/dist e apps/backend/dist.
 
-## Executar separadamente
+## Executar cada workspace
 
-A partir da raiz:
+Na raiz:
 
 ```bash
 npm run dev:frontend
 npm run dev:backend
-
-npm run build --workspace frontend
-npm run build --workspace backend
-npm test --workspace frontend
-npm test --workspace backend
-
-# Depois de npm run build:
 npm run preview --workspace frontend
 npm start --workspace backend
 ```
 
-Para conferir o endpoint:
+Dentro de apps/frontend ou apps/backend, `npm run dev`, `npm run build` e `npm test` também usam a configuração central. Para produção local do backend, execute o build antes de npm start.
 
 ```bash
 curl --fail http://127.0.0.1:3000/health
@@ -81,58 +87,14 @@ curl --fail http://127.0.0.1:3000/health
 
 Resposta: `{"status":"ok","service":"duelo-3d-backend"}`.
 
-O backend escuta exclusivamente em `127.0.0.1`. A porta padrão é 3000, configurável por `PORT`, um inteiro de 1 a 65535:
+## Formatação e testes
 
-```bash
-PORT=3001 npm run dev:backend
-```
+Prettier 3.9.10 permanece como devDependency da raiz. `npm run format` aplica formatação e `npm run format:check` apenas verifica. Documentos arquivados em docs/historico e os vídeos ficam fora da formatação. HTML/CSS não foram redesenhados. Ajustes de recuo em TypeScript não alteram regras de votação.
 
-Opcionalmente copie `apps/backend/.env.example` para `apps/backend/.env`. A inicialização carrega esse arquivo se existir usando `process.loadEnvFile`, sem dependência dotenv, ignorando somente ENOENT. O script dev é `node --watch src/main.ts`: o caminho opcional não é passado ao watcher. Nenhum arquivo é criado automaticamente. Alterações no `.env` do backend exigem reiniciar o processo. Variáveis já definidas no terminal têm prioridade. Nenhuma credencial é necessária; arquivos `.env` permanecem ignorados.
+Os testes cobrem placar, DOM, integridade dos seis WebM, porta ocupada, configuração central independente do cwd, prioridade do terminal, host seguro e backend em --watch com/sem .env. Os subprocessos de teste usam NO_COLOR=1 e removem FORCE_COLOR para evitar saídas ANSI.
 
-## Porta do frontend
-
-`FRONTEND_PORT` configura somente o servidor de desenvolvimento, com padrão 5173. O Vite carrega `.env`, `.env.local` e arquivos por modo usando `loadEnv`, a partir de `apps/frontend`. O arquivo de exemplo é `apps/frontend/.env.example`; copiar para `.env` é opcional.
-
-```bash
-FRONTEND_PORT=5200 npm run dev:frontend
-# Ou os dois serviços com portas escolhidas pelo terminal:
-FRONTEND_PORT=5200 PORT=3001 npm run dev
-```
-
-Valores do terminal têm prioridade sobre os arquivos. Valores vazios, fracionários, não numéricos ou fora de 1 a 65535 produzem erro com o nome da variável. Com `server.strictPort: true`, uma porta ocupada encerra o Vite com erro, sem avançar para 5174/5175; libere a porta ou escolha outra explicitamente.
-
-O host permanece `127.0.0.1`. A variável não usa o prefixo `VITE_` e não é exposta ao navegador. Não há `VITE_API_BASE_URL`, proxy ou integração com o backend. O preview continua na porta padrão 4173 e não usa FRONTEND_PORT.
-
-## Frontend e mídias
-
-O frontend foi movido a partir do commit `2cdee325df80e6278855c2d3e5d94bab7e500e1b` da main, incluindo o layout do PR #2. HTML, CSS, módulos visuais, animações e oito testes de regras/DOM mantêm os mesmos objetos Git. Os seis WebM reutilizam exatamente os objetos existentes; não houve upload Base64, conversão ou substituição.
-
-As URLs públicas continuam em `/videos/...`; os caminhos relativos entre código e testes permanecem válidos dentro do workspace. Vite mantém sua configuração `base: './'`.
-
-O teste de mídia continua verificando catálogo, quantidade, tamanho, cabeçalho e conteúdo integral. Seu manifesto foi corrigido para os vídeos efetivamente presentes na main: o anterior ainda descrevia tamanhos/hashes de uma versão antiga do ZIP. Agora a referência é o SHA do objeto Git (`SHA-1("blob " + tamanho + NUL + bytes)`), verificável localmente sem acesso a Git ou à rede. Isso preserva a referência exata dos binários atuais, sem inventar novos SHA-256.
-
-## Formatação
-
-```bash
-npm run format:check
-npm run format
-```
-
-Prettier **3.9.10** está declarado como devDependency da raiz e no lockfile único, sem mudança da versão já resolvida. A configuração Prettier existente permanece na raiz. Uma formatação global pode alterar a apresentação textual de arquivos históricos; revise o diff antes de commitá-la. A migração não reformatou o frontend.
+A versão atual prevê 21 cenários (14 frontend e 7 backend); isso é contagem esperada, não um resultado de execução. Nesta sessão o executor está indisponível: npm ci, build, testes, mídia por HTTP, Prettier e dev não puderam ser executados. Veja docs/validacao-monorepo.md.
 
 ## Limitações e próximas fases
 
-Frontend e backend são independentes: não há comunicação entre eles, armazenamento, motor de pontuação no servidor, comentários, presentes, WebSocket, autenticação, Docker ou hospedagem em nuvem. A integração TikTok LIVE **não foi implementada**. O placar continua local e reinicia ao recarregar a página.
-
-Nesta sessão não havia ambiente de execução utilizável: instalação, compilação, testes, inicialização HTTP e conferência visual do monorepo não puderam ser executados. A revisão realizada foi estática e por hashes Git. O usuário relatou que a versão anterior passou em build, dez testes e check:media no Ubuntu com Node 24.13.1/npm 11.8.0, com avisos EBADENGINE. Esse resultado não valida as novas correções. Reexecute os comandos abaixo com Node >=24.15.0 na linha 24 antes do merge; não foi confirmada aqui a eliminação dos avisos. Veja `docs/validacao-monorepo.md` e `docs/correcoes-configuracao.md`.
-
-```bash
-npm ci
-npm run build
-npm test
-npm run check:media
-npm run format:check
-npm run dev
-```
-
-Próximas fases, sujeitas a novo escopo e autorização: validar regras/eventos externos, definir adaptador TikTok, definir sincronização entre backend e frontend. Nenhuma dessas fases está antecipada nesta entrega.
+Sem integração TikTok LIVE, comentários, presentes, WebSocket, persistência, autenticação, Docker ou deploy. Backend não processa votos e frontend não o consulta. Qualquer integração ou refatoração interna posterior depende de novo escopo.

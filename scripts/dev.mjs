@@ -31,9 +31,11 @@ function stop(code) {
 process.on('SIGINT', () => stop(130));
 process.on('SIGTERM', () => stop(143));
 for (const workspace of ['frontend', 'backend']) {
-    const child = spawn(process.execPath, [
-        npmCli, 'run', 'dev', '--workspace', workspace,
-    ], { cwd: root, stdio: 'inherit', detached: grouped });
+    const child = spawn(
+        process.execPath,
+        [npmCli, 'run', 'dev', '--workspace', workspace],
+        { cwd: root, stdio: 'inherit', detached: grouped },
+    );
     children.push(child);
     child.on('error', (error) => {
         console.error(`Não foi possível iniciar ${workspace}:`, error.message);
@@ -41,7 +43,9 @@ for (const workspace of ['frontend', 'backend']) {
     });
     child.on('exit', (code, signal) => {
         if (!stopping) {
-            console.error(`${workspace} encerrou (${signal ?? code}); encerrando o conjunto.`);
+            console.error(
+                `${workspace} encerrou (${signal ?? code}); encerrando o conjunto.`,
+            );
             stop(code || 1);
         }
     });

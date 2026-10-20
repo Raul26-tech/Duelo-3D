@@ -15,7 +15,7 @@ npm test
 npm run dev
 ```
 
-Node precisa ser 24+ e npm 11+. Os endereços padrão são http://127.0.0.1:5173 e http://127.0.0.1:3000/health. Veja validacao-monorepo.md para conferir os vídeos e o build em produção.
+Node precisa ser >=24.15.0 na linha 24 e npm 11+. Os endereços padrão são http://127.0.0.1:5173 e http://127.0.0.1:3000/health. Veja validacao-monorepo.md para conferir os vídeos e o build em produção.
 
 Se precisar corrigir algo após testar, faça commit somente na branch de trabalho:
 
@@ -30,6 +30,6 @@ git commit -m "fix: validate monorepo foundation"
 git push origin HEAD:refs/heads/chore/monorepo-foundation
 ```
 
-Não inclua .env, node_modules, dist, backups ou experimentos. Não faça force push nem escreva diretamente em main. Se o push for rejeitado, faça fetch e inspecione as alterações remotas antes de integrar.
+Utilize somente o .env opcional da raiz, com FRONTEND_PORT, BACKEND_PORT e BACKEND_HOST; o exemplo é /.env.example. Não inclua .env, node_modules, dist, backups ou experimentos. Não faça force push nem escreva diretamente em main. Se o push for rejeitado, faça fetch e inspecione as alterações remotas antes de integrar.
 
 O PR deve ter base main e compare chore/monorepo-foundation e permanecer aberto para revisão. Não faça merge sem aprovação.

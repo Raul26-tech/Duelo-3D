@@ -1,76 +1,42 @@
-# Correções de configuração do monorepo
+# Configuração central do monorepo
 
-## Base e escopo
+## Organização final
 
-Branch existente chore/monorepo-foundation, a partir de 23330cdfa81db784a449acda6b84fbc48bb60d93; PR #3 preservado. A main não recebe commits. Nenhuma alteração em HTML, CSS, personagens, vídeos, animações ou regras de votação.
+Arquivo local único: /.env, opcional e ignorado pelo Git.
+Exemplo versionado único: /.env.example.
 
-## Causas e soluções
-
-| Problema | Causa identificada | Correção |
-| --- | --- | --- |
-| ENOENT no backend sem .env | O comando combinava --watch com --env-file-if-exists=.env; no Node 24.13.1 o usuário observou o watcher tentar vigiar o caminho inexistente | Removida a opção da CLI; main carrega o arquivo opcional com a API nativa loadEnvFile em runtime e ignora somente ENOENT |
-| Frontend em 5174/5175 | Comportamento padrão do Vite ao encontrar a porta ocupada; não havia configuração da variável | loadEnv no vite.config.ts, FRONTEND_PORT validada, padrão 5173, host 127.0.0.1 e strictPort true |
-| Prettier indisponível como dependência direta | package.json raiz e entrada raiz do lock tinham devDependencies vazias, apesar da presença do pacote no lock | Prettier 3.9.10 declarado na raiz e na entrada raiz do lock, sem alteração da versão ou integridade |
-| EBADENGINE | engines >=24.0.0 aceitava 24.13.1, abaixo do exigido pelas dependências já resolvidas | engines ^24.15.0 na raiz e nos workspaces e respectivos registros do lock; .nvmrc 24.15.0 |
-
-A causa do erro do watcher é inferida do comando publicado e do erro relatado pelo usuário; não houve reprodução nesta sessão indisponível.
-
-## Decisões
-
-- A API process.loadEnvFile é nativa e estável na linha Node 24. O carregamento preserva variáveis existentes no terminal. Não se cria .env vazio e não se adiciona dotenv.
-- O backend continua com porta padrão 3000, host 127.0.0.1 e apenas GET /health. O arquivo opcional é procurado no diretório de execução do workspace. Sua edição exige reiniciar o backend.
-- O frontend usa loadEnv com prefixo de leitura FRONTEND_, sem mudar envPrefix nem definir variáveis no bundle. Não há VITE_FRONTEND_PORT ou VITE_API_BASE_URL.
-- FRONTEND_PORT afeta somente o dev; preview mantém sua configuração existente. Porta ocupada gera erro, sem fallback. Base './' preservada.
-- As versões/resoluções de dependências foram mantidas. Não se executou atualização geral nem formatação de arquivos existentes.
-- .prettierrc.json e .prettierignore permanecem inalterados. format:check poderá apontar arquivos preexistentes fora do padrão; seu resultado não foi executado nem encoberto com exclusões.
-
-## Testes acrescentados (pendentes de execução)
-
-Frontend, quatro cenários em tests/config.test.ts:
-1. Porta padrão, limites válidos e rejeição de entradas inválidas.
-2. Configuração sem .env com host, strictPort e base preservados.
-3. Carregamento por arquivo/modo e prioridade do terminal.
-4. Vite real rejeitando uma porta reservada, sem tentar a próxima.
-
-Backend, três cenários em tests/environment.test.ts:
-1. Arquivo ausente não causa erro, não é criado e mantém porta 3000.
-2. Arquivo presente é carregado, terminal prevalece e ENOTDIR não é ignorado.
-3. Processo Node --watch real inicia sem .env e responde ao contrato de /health; limpeza do processo e filhos no teste.
-
-Os dez testes anteriores não foram editados. O total esperado passa a 17. Testes usam diretórios temporários e portas efêmeras; não sobrescrevem arquivos .env do desenvolvedor.
-
-## Evidências e validação
-
-O usuário informou, para a versão anterior: npm ci concluído com avisos EBADENGINE; build aprovado; dez testes aprovados; check:media aprovado; frontend iniciado e visualmente conferido no Ubuntu com Node 24.13.1/npm 11.8.0.
-
-Nesta sessão, a tentativa de consultar node --version falhou com "No usable execution environment is available". Não foi possível executar npm ci, build, testes, check:media, format:check ou dev. Não foi testado HTTP nem Ctrl+C, nem foi realizada conferência visual. Não foi confirmada a eliminação de EBADENGINE. Revisão estática não substitui essas verificações.
-
-### Verificação local após atualizar a branch
-
-```bash
-git switch chore/monorepo-foundation
-git pull --ff-only
-# Com nvm instalado:
-nvm install
-nvm use
-node --version
-npm --version
-npm ci
-npm run build
-npm test
-npm run check:media
-npm run format:check
-npm run dev
+```dotenv
+FRONTEND_PORT=5173
+BACKEND_PORT=3000
+BACKEND_HOST=127.0.0.1
 ```
 
-Sem arquivos .env, verificar frontend em 127.0.0.1:5173 e backend em 127.0.0.1:3000/health (200 e corpo esperado). Se algum .env local já existir, preserve-o; faça o cenário sem .env num clone novo.
+Os exemplos antes localizados em apps/frontend e apps/backend foram removidos do versionamento. Nenhum arquivo .env real foi lido, publicado ou apagado nesta operação. Migre valores locais para a raiz e substitua PORT por BACKEND_PORT.
 
-Em outra execução, conferir `FRONTEND_PORT=5200 npm run dev`, valor inválido e porta ocupada (use um servidor de teste já ativo, ou dois processos Vite, um por terminal). Confira que o segundo Vite falha sem escolher outra porta. Confira também os seis vídeos e Ctrl+C liberando as portas dos dois serviços.
+## Implementação
 
-Copiar exemplos para .env é opcional; configurar PORT e FRONTEND_PORT simultaneamente no terminal deve prevalecer sobre os arquivos. Não publique os arquivos .env.
+Backend: resolveRootEnvPath usa import.meta.url e ../../../.env. src e dist ficam à mesma profundidade. loadOptionalEnv usa a API nativa process.loadEnvFile, ignora somente ENOENT e mantém prioridade do terminal. O watcher recebe somente o entrypoint. Host validado por lista explícita: 127.0.0.1 ou ::1; a porta BACKEND_PORT deve ser um inteiro de 1 a 65535, padrão 3000. GET /health permanece com o mesmo contrato.
 
-## Referências oficiais
+Frontend: root deriva da localização de vite.config.ts; envDir deriva de ../../ em relação ao mesmo módulo. loadEnv recebe esse diretório central e lê somente o prefixo FRONTEND_ para configurar a porta. server.host continua 127.0.0.1, strictPort true, base './'. Não houve alteração de envPrefix ou criação de define para expor valores ao cliente. Variáveis privadas não usam VITE_.
 
-- https://nodejs.org/docs/latest-v24.x/api/process.html#processloadenvfilepath
-- https://vite.dev/config/#using-environment-variables-in-config
-- https://vite.dev/config/server-options.html#server-strictport
+Vite mantém o suporte nativo a variantes de arquivo por modo na raiz. A configuração comum suportada pelos dois serviços é somente /.env: não use variantes para valores que precisam ser compartilhados, pois o backend carrega exclusivamente esse arquivo.
+
+## Regressões corrigidas
+
+- Arquivo opcional ausente não é registrado diretamente no watcher.
+- Caminhos não dependem do cwd do npm ou do processo.
+- Subprocessos de teste desativam cores com NO_COLOR=1 e remoção de FORCE_COLOR.
+- Resultados de configuração são emitidos como JSON, sem comparar números coloridos.
+- Os fixtures criam monorepos temporários e arquivos deliberadamente divergentes por workspace/cwd para confirmar que só a raiz é usada.
+- Hosts públicos, curingas e nomes externos são rejeitados antes de listen.
+- Testes incluem origens src/dist e processos --watch com/sem arquivo central.
+
+## Formatação
+
+Configurações JSON e recuos TypeScript foram ajustados de forma controlada. .prettierrc mantém as mesmas opções. docs/historico foi excluído explicitamente da formatação para preservar os arquivos arquivados. Vídeos e arquivos de layout não foram alterados.
+
+Sem executor, não foi possível aplicar o Prettier real ou confirmar que os 20 apontamentos relatados foram todos eliminados. npm run format:check permanece como verificação pendente, sem esconder código ou configurações por meio de novas exclusões. Uma revisão local deve limitar qualquer formatação complementar aos arquivos apontados, sem alterar documentos históricos.
+
+## Validação
+
+Veja validacao-monorepo.md. As verificações por Node/npm não foram executadas nesta sessão. A revisão estática de caminhos, opções e preservação de arquivos não constitui aprovação dos testes ou do build.

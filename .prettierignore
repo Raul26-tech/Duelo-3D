@@ -3,3 +3,5 @@ dist/
 coverage/
 package-lock.json
 apps/frontend/public/videos/
+# Documentos arquivados preservam a formatação original.
+docs/historico/
