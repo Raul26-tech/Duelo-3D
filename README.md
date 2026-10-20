@@ -38,13 +38,13 @@ O Prettier padroniza TypeScript, CSS, HTML, JSON e Markdown. Use `npm run format
 | `src/components/animations.ts` | Vídeos, salto CSS e timers                                                     |
 | `src/events/simulation.ts`     | Botões manuais convertidos em eventos de voto/reset                            |
 | `src/main.ts`                  | Composição dos módulos e limpeza no hot reload                                 |
-| `src/styles/main.css`          | Estilos do protótipo, com formatação padronizada pelo Prettier                 |
+| `src/styles/main.css`          | Arena responsiva, painéis neon e plataformas em perspectiva                    |
 | `public/videos/`               | Seis WebM originais, sem conversão                                             |
 | `tests/`                       | Regras, interação via DOM virtual e integridade das mídias                     |
 
 O fluxo é: botão → evento → store/regras → renderização/animações. Um futuro adaptador poderá despachar eventos `vote` com `side` e `amount` pelo mesmo contrato, sem modificar os cálculos. Não há integração externa implementada. Valores de voto precisam ser inteiros positivos, com proteção do limite seguro do JavaScript.
 
-## Comportamento preservado
+## Comportamento da aplicação
 
 - Lula e Flávio, seis vídeos WebM, placar individual e barra proporcional.
 - Liderança, desvantagem e empate, inclusive status EMPATE no placar inicial.
@@ -52,7 +52,7 @@ O fluxo é: botão → evento → store/regras → renderização/animações. U
 - Sem votos, ambas as barras têm largura zero, como no JavaScript original.
 - O voto dá prioridade ao vídeo de salto, que permanece em loop até outro evento de renderização, como no protótipo; a classe CSS de salto é retirada após 1,4 s.
 - Reset também cancela os timers de salto e remove a classe imediatamente.
-- Estrutura HTML, estilos, cores e breakpoint de 600 px preservados. A nota de rodapé explicita a natureza informal da enquete.
+- Arena com painéis de nomes e pontuação no topo, barras individuais, plataformas iluminadas e controles responsivos. O salto CSS movimenta somente o vídeo do personagem. A nota de rodapé explicita a natureza informal da enquete.
 
 Autoplay continua mudo e pode depender das políticas do navegador. Consulte `validacao.md` para distinguir testes automatizados de validação visual.
 
