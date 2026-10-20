@@ -1,5 +1,7 @@
 import { createBackendServer, resolvePort } from './server.ts';
+import { loadOptionalEnv } from './environment.ts';
 
+loadOptionalEnv();
 const port = resolvePort(process.env.PORT);
 const server = createBackendServer();
 server.on('error', (error) => {

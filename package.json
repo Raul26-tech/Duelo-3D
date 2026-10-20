@@ -1,25 +1,27 @@
 {
-  "name": "duelo-3d",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "engines": {
-    "node": ">=24.0.0",
-    "npm": ">=11.0.0"
-  },
-  "workspaces": [
-    "apps/frontend",
-    "apps/backend"
-  ],
-  "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "dev:frontend": "npm run dev --workspace frontend",
-    "dev:backend": "npm run dev --workspace backend",
-    "build": "npm run build --workspaces",
-    "test": "npm test --workspaces",
-    "check:media": "npm run check:media --workspace frontend",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "devDependencies": {}
+    "name": "duelo-3d",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "engines": {
+        "node": "^24.15.0",
+        "npm": ">=11.0.0"
+    },
+    "workspaces": [
+        "apps/frontend",
+        "apps/backend"
+    ],
+    "scripts": {
+        "dev": "node scripts/dev.mjs",
+        "dev:frontend": "npm run dev --workspace frontend",
+        "dev:backend": "npm run dev --workspace backend",
+        "build": "npm run build --workspaces",
+        "test": "npm test --workspaces",
+        "check:media": "npm run check:media --workspace frontend",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "devDependencies": {
+        "prettier": "3.9.10"
+    }
 }

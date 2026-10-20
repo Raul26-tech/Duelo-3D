@@ -1,5 +1,12 @@
 # Validação da migração para monorepo
 
+## Atualização — correções de configuração
+
+O usuário confirmou a validação local da versão anterior no Ubuntu, Node 24.13.1/npm 11.8.0: instalação com avisos EBADENGINE, build aprovado, dez testes aprovados, check:media aprovado e frontend visualmente conferido. Identificou também a falha do backend em modo watch sem .env e a alternância automática de porta do Vite.
+
+As novas correções e sete novos testes estão descritos em [correcoes-configuracao.md](correcoes-configuracao.md). O requisito atual é Node >=24.15.0 dentro da linha 24. As verificações das correções permanecem pendentes por indisponibilidade do executor. Os registros abaixo documentam a etapa anterior, não resultados das correções.
+
+
 ## Estado da sessão
 
 Não há ambiente de execução utilizável nesta sessão. A tentativa de acessar o executor retornou: "No usable execution environment is available". Não foi possível instalar pacotes, executar Node/npm, iniciar servidores ou abrir um navegador. A validação visual local relatada pelo usuário pertence ao frontend antes desta migração.
