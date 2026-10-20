@@ -31,15 +31,15 @@ A fundação adicionou o backend HTTP, testes e configurações sob apps/backend
 
 ## Decisões
 
--   npm workspaces suficientes para duas aplicações. Nenhum workspace compartilhado vazio.
--   Dependências específicas declaradas no workspace consumidor. TypeScript/@types/node do backend têm as mesmas versões já presentes no frontend, permitindo o hoist pelo npm sem novas resoluções.
--   Prettier é ferramenta do repositório e fica na raiz.
--   Backend em ESM, HTTP nativo do Node e host fixo 127.0.0.1. Somente GET /health retorna 200; rotas/métodos restantes retornam 404.
--   Dev usa execução TypeScript nativa do Node >=24.15.0 na linha 24; build usa NodeNext e rewriteRelativeImportExtensions para produzir imports .js em dist.
--   BACKEND_PORT e BACKEND_HOST são validados antes de listen; frontend usa FRONTEND_PORT. Ambos localizam o .env opcional na raiz por caminhos de módulo, sem depender do cwd. Veja correcoes-configuracao.md para os detalhes atuais.
--   O teste HTTP usa porta efêmera no loopback para evitar conflito com a porta 3000.
--   Orquestração local via child_process, sem pacote adicional. Ctrl+C/terminação encerram os grupos de processos no Ubuntu; uma saída inesperada encerra o conjunto.
--   Eventos, regras e animações do frontend não dependem do novo backend.
+- npm workspaces suficientes para duas aplicações. Nenhum workspace compartilhado vazio.
+- Dependências específicas declaradas no workspace consumidor. TypeScript/@types/node do backend têm as mesmas versões já presentes no frontend, permitindo o hoist pelo npm sem novas resoluções.
+- Prettier é ferramenta do repositório e fica na raiz.
+- Backend em ESM, HTTP nativo do Node e host fixo 127.0.0.1. Somente GET /health retorna 200; rotas/métodos restantes retornam 404.
+- Dev usa execução TypeScript nativa do Node >=24.15.0 na linha 24; build usa NodeNext e rewriteRelativeImportExtensions para produzir imports .js em dist.
+- BACKEND_PORT e BACKEND_HOST são validados antes de listen; frontend usa FRONTEND_PORT. Ambos localizam o .env opcional na raiz por caminhos de módulo, sem depender do cwd. Veja correcoes-configuracao.md para os detalhes atuais.
+- O teste HTTP usa porta efêmera no loopback para evitar conflito com a porta 3000.
+- Orquestração local via child_process, sem pacote adicional. Ctrl+C/terminação encerram os grupos de processos no Ubuntu; uma saída inesperada encerra o conjunto.
+- Eventos, regras e animações do frontend não dependem do novo backend.
 
 ## Publicação
 

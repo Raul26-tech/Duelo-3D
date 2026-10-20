@@ -41,11 +41,7 @@ function childEnv(values: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     return { ...env, ...values, NO_COLOR: '1' };
 }
 
-function probe(
-    moduleDir: string,
-    cwd: string,
-    values: NodeJS.ProcessEnv = {},
-) {
+function probe(moduleDir: string, cwd: string, values: NodeJS.ProcessEnv = {}) {
     const environment = pathToFileURL(join(moduleDir, 'environment.ts')).href;
     const server = pathToFileURL(join(moduleDir, 'server.ts')).href;
     return spawnSync(
