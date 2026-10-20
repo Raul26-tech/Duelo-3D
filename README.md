@@ -1,8 +1,8 @@
-# Duelo 3D — simulação local em tempo real
+# Duelo 3D — simulação local e motor de regras
 
 Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa.
 
-O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP e WebSocket). O backend é a única autoridade da simulação: os botões enviam comandos e a arena atualiza somente quando recebe estado do servidor. Não há TikTok, comentários, presentes, persistência ou disputa real.
+O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP e WebSocket). O backend é a única autoridade da simulação: os botões enviam comandos e a arena atualiza somente quando recebe estado do servidor. Não há ingestão TikTok, persistência ou disputa real. A Fase 3 acrescenta um motor interno e testável de comentários/presentes, independente do transporte e ainda sem entrada externa ou ligação com a arena.
 
 ## Executar juntos
 
@@ -62,8 +62,14 @@ A conexão usa snapshot, versão monotônica, descarte de sockets/sessões antig
 
 Arquitetura, contratos, limites, exemplos e segurança: [docs/realtime-simulation.md](docs/realtime-simulation.md).
 
-## Validação desta entrega
+## Motor de regras — Fase 3
 
-HTML, CSS, seis vídeos e os módulos de renderização/animação foram preservados. Os cenários anteriores continuam presentes; total esperado após novas verificações: 38.
+`apps/backend/src/scoring` interpreta comentários com um único candidato, valida presentes pelo catálogo do servidor e controla identidades e combos acumulados. O catálogo padrão é vazio; dados sintéticos existem somente nos testes. O motor aceita simulação e observação, rejeita modo real e não adiciona endpoints ou dependências.
 
-Não há executor utilizável nesta sessão. Instalação, compilação, testes Node, formatação, serviços HTTP/WS, navegador e Ctrl+C não foram executados. As verificações isoladas do redutor em JavaScript não substituem esses comandos. As novas dependências/entradas do lock também precisam da confirmação de npm ci. O PR deve ser validado localmente antes do merge.
+A simulação WebSocket existente permanece preservada. O novo motor não recebe comandos do navegador e ainda não alimenta a arena. A integração futura deverá autenticar a fonte antes de construir os eventos normalizados.
+
+Contratos, limites, política de finalização de combos e exemplos: [docs/scoring-engine.md](docs/scoring-engine.md).
+
+## Validação da Fase 3
+
+Veja [docs/validacao-scoring-engine.md](docs/validacao-scoring-engine.md) para os comandos executados e suas limitações. Os 38 testes existentes foram preservados; o motor acrescenta testes unitários e de integridade. HTML, CSS, transporte, animações e seis WebM não são alterados por esta fase.
