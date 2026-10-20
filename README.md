@@ -1,65 +1,100 @@
-# Duelo 3D
+# Duelo 3D — monorepo
 
-Frontend de uma enquete informal de entretenimento entre Lula e Flávio Bolsonaro. Não tem vínculo com votação eleitoral oficial nem constitui pesquisa representativa. Todos os votos são simulados localmente; o placar é perdido ao atualizar a página.
+Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa. Frontend e backend são independentes: a votação continua simulada no navegador, e o backend oferece somente GET /health.
 
-## Requisitos e execução
+## Organização
 
-Use Node.js 24 ou superior e npm. A instalação precisa de acesso ao registro npm. Após a instalação, o frontend e seus vídeos não dependem de serviços externos.
+- `apps/frontend`: Vite, TypeScript, HTML/CSS, animações WebM e testes.
+- `apps/backend`: HTTP nativo Node.js, TypeScript ESM e testes.
+- `scripts/dev.mjs`: inicia os dois serviços e encerra seus processos filhos.
+- `docs/`: decisões e validação; `docs/historico/` preserva documentos antigos.
+- `.env.example`: único exemplo de configuração do monorepo.
+- `package.json` e `package-lock.json`: npm workspaces e lockfile único.
+
+## Requisitos e instalação
+
+Node **24.15.0 ou superior dentro da linha 24** (`^24.15.0`) e npm 11+.
+O requisito acompanha as dependências existentes, sem atualizar suas versões.
 
 ```bash
+# Se usar nvm:
+nvm install
+nvm use
 npm ci
 npm run dev
 ```
 
-Abra o endereço mostrado no terminal (normalmente http://127.0.0.1:5173). Não abra o HTML diretamente com file://.
+A criação de .env não é necessária. Sem o arquivo, os dois serviços usam seus padrões.
+
+## Um único arquivo de ambiente
+
+Opcionalmente, crie `.env` na **raiz do repositório**, usando `.env.example`:
+
+```dotenv
+FRONTEND_PORT=5173
+BACKEND_PORT=3000
+BACKEND_HOST=127.0.0.1
+```
+
+Não mantenha configuração em arquivos .env por workspace. As aplicações não os leem. A migração não apaga arquivos locais; se já existirem, transfira os valores desejados para a raiz por conta própria. O antigo PORT foi substituído por BACKEND_PORT e não é usado como fallback.
+
+Somente o exemplo da raiz é versionado. .env e suas variantes locais continuam ignorados pelo Git. Não sobrescreva um .env existente ao copiar exemplos.
+
+As variáveis do terminal têm prioridade:
 
 ```bash
+FRONTEND_PORT=5200 BACKEND_PORT=3001 npm run dev
+```
+
+O backend encontra o arquivo pela localização de seu módulo (tanto src quanto dist), carrega-o com process.loadEnvFile e ignora somente ENOENT. Não passa um arquivo inexistente ao watcher e não depende do diretório atual. Alterações no .env do backend exigem reiniciar o processo.
+
+O Vite fixa root no frontend e envDir na raiz do monorepo e usa loadEnv para a configuração do servidor. Nenhum .env dentro de apps é carregado. A convenção de modos do Vite continua disponível na raiz; para manter a mesma configuração nos dois serviços, utilize apenas o .env central, pois o backend não carrega variantes por modo.
+
+FRONTEND_PORT e BACKEND_PORT devem ser inteiros entre 1 e 65535. O frontend usa strictPort e host 127.0.0.1: uma porta ocupada gera erro, sem escolher 5174/5175. BACKEND_HOST aceita somente os literais 127.0.0.1 e ::1; vazio, localhost, 0.0.0.0, ::, endereços de rede e nomes externos são rejeitados para impedir exposição acidental.
+
+Os endereços padrão são http://127.0.0.1:5173 e http://127.0.0.1:3000/health. O preview do frontend permanece na porta 4173; FRONTEND_PORT controla somente o dev.
+
+Variáveis privadas, inclusive futuras credenciais TikTok, destinam-se exclusivamente ao backend. Não use prefixo VITE_ em segredos. envPrefix não foi ampliado e o arquivo central não é publicado como asset do frontend. FRONTEND_PORT não é inserida no bundle.
+
+## Comandos na raiz
+
+```bash
+npm run dev
 npm run build
-npm run preview
 npm test
 npm run check:media
-npm run format
 npm run format:check
 ```
 
-O build executa a checagem TypeScript e gera `dist/`, incluindo os vídeos. O preview serve esse build em http://127.0.0.1:4173. Os testes usam o executor nativo do Node e jsdom para o DOM; jsdom não reproduz vídeos.
+Ctrl+C no dev conjunto encerra os grupos de processos no Ubuntu. O build gera apps/frontend/dist e apps/backend/dist.
 
-O Prettier padroniza TypeScript, CSS, HTML, JSON e Markdown. Use `npm run format` para formatar os arquivos e `npm run format:check` para conferir a formatação. As regras estão em `.prettierrc.json`; arquivos gerados, o lockfile e vídeos são excluídos por `.prettierignore`, e os padrões do `.gitignore` também são respeitados.
+## Executar cada workspace
 
-## Arquitetura
+Na raiz:
 
-| Caminho                        | Responsabilidade                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------ |
-| `src/core/score.ts`            | Estado inicial, votos, percentuais e liderança; funções sem dependência do DOM |
-| `src/core/store.ts`            | Estado em memória, despacho de eventos e assinaturas                           |
-| `src/config/participants.ts`   | Participantes, identificadores e catálogo das seis animações                   |
-| `src/components/elements.ts`   | Referências obrigatórias da interface                                          |
-| `src/components/render.ts`     | Apresentação do placar, barras e status                                        |
-| `src/components/animations.ts` | Vídeos, salto CSS e timers                                                     |
-| `src/events/simulation.ts`     | Botões manuais convertidos em eventos de voto/reset                            |
-| `src/main.ts`                  | Composição dos módulos e limpeza no hot reload                                 |
-| `src/styles/main.css`          | Arena responsiva, painéis neon e plataformas em perspectiva                    |
-| `public/videos/`               | Seis WebM originais, sem conversão                                             |
-| `tests/`                       | Regras, interação via DOM virtual e integridade das mídias                     |
+```bash
+npm run dev:frontend
+npm run dev:backend
+npm run preview --workspace frontend
+npm start --workspace backend
+```
 
-O fluxo é: botão → evento → store/regras → renderização/animações. Um futuro adaptador poderá despachar eventos `vote` com `side` e `amount` pelo mesmo contrato, sem modificar os cálculos. Não há integração externa implementada. Valores de voto precisam ser inteiros positivos, com proteção do limite seguro do JavaScript.
+Dentro de apps/frontend ou apps/backend, `npm run dev`, `npm run build` e `npm test` também usam a configuração central. Para produção local do backend, execute o build antes de npm start.
 
-## Comportamento da aplicação
+```bash
+curl --fail http://127.0.0.1:3000/health
+```
 
-- Lula e Flávio, seis vídeos WebM, placar individual e barra proporcional.
-- Liderança, desvantagem e empate, inclusive status EMPATE no placar inicial.
-- Voto manual +1, reset e animação CSS de salto.
-- Sem votos, ambas as barras têm largura zero, como no JavaScript original.
-- O voto dá prioridade ao vídeo de salto, que permanece em loop até outro evento de renderização, como no protótipo; a classe CSS de salto é retirada após 1,4 s.
-- Reset também cancela os timers de salto e remove a classe imediatamente.
-- Arena com painéis de nomes e pontuação no topo, barras individuais, plataformas iluminadas e controles responsivos. O salto CSS movimenta somente o vídeo do personagem. A nota de rodapé explicita a natureza informal da enquete.
+Resposta: `{"status":"ok","service":"duelo-3d-backend"}`.
 
-Autoplay continua mudo e pode depender das políticas do navegador. Consulte `validacao.md` para distinguir testes automatizados de validação visual.
+## Formatação e testes
 
-## Escopo e evolução
+Prettier 3.9.10 permanece como devDependency da raiz. `npm run format` aplica formatação e `npm run format:check` apenas verifica. Documentos arquivados em docs/historico e os vídeos ficam fora da formatação. HTML/CSS não foram redesenhados. Ajustes de recuo em TypeScript não alteram regras de votação.
 
-Vite e TypeScript organizam o frontend sem framework de interface ou backend. Não há TikTok, comentários, presentes, WebSockets, banco de dados ou persistência. A evolução poderá acrescentar adaptadores de entrada, revisão de acessibilidade e testes em navegador, mediante escopo próprio.
+Os testes cobrem placar, DOM, integridade dos seis WebM, porta ocupada, configuração central independente do cwd, prioridade do terminal, host seguro e backend em --watch com/sem .env. Os subprocessos de teste usam NO_COLOR=1 e removem FORCE_COLOR para evitar saídas ANSI.
 
-O ZIP original continua sendo a fonte de preservação dos backups e experimentos. Esses materiais não foram copiados para esta entrega. `.gitignore` exclui dependências, build, ambientes, arquivos Blender e diretórios experimentais.
+A versão atual prevê 21 cenários (14 frontend e 7 backend); isso é contagem esperada, não um resultado de execução. Nesta sessão o executor está indisponível: npm ci, build, testes, mídia por HTTP, Prettier e dev não puderam ser executados. Veja docs/validacao-monorepo.md.
 
-Consulte `diagnostico.md`, `validacao.md` e `PUBLICAR-UBUNTU.md`.
+## Limitações e próximas fases
+
+Sem integração TikTok LIVE, comentários, presentes, WebSocket, persistência, autenticação, Docker ou deploy. Backend não processa votos e frontend não o consulta. Qualquer integração ou refatoração interna posterior depende de novo escopo.

@@ -1,26 +1,27 @@
 {
-  "name": "duelo-3d",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "engines": {
-    "node": ">=24.0.0"
-  },
-  "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test tests/*.test.ts",
-    "check:media": "node --test tests/media.test.ts",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "devDependencies": {
-    "@types/jsdom": "30.0.0",
-    "@types/node": "26.6.5",
-    "jsdom": "30.1.3",
-    "prettier": "3.9.10",
-    "typescript": "7.0.2",
-    "vite": "8.3.4"
-  }
+    "name": "duelo-3d",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "engines": {
+        "node": "^24.15.0",
+        "npm": ">=11.0.0"
+    },
+    "workspaces": [
+        "apps/frontend",
+        "apps/backend"
+    ],
+    "scripts": {
+        "dev": "node scripts/dev.mjs",
+        "dev:frontend": "npm run dev --workspace frontend",
+        "dev:backend": "npm run dev --workspace backend",
+        "build": "npm run build --workspaces",
+        "test": "npm test --workspaces",
+        "check:media": "npm run check:media --workspace frontend",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "devDependencies": {
+        "prettier": "3.9.10"
+    }
 }

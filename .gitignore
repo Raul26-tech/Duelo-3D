@@ -3,7 +3,7 @@ dist/
 coverage/
 *.log
 .env*
-!.env.example
+!/.env.example
 backup-original/
 reference/
 animacao-personagens/
