@@ -72,14 +72,14 @@ type State = {
 };
 ```
 
-| Mensagem | Campos e finalidade |
-| --- | --- |
-| simulation.authorize | type, correlationId, token; primeiro comando da conexão |
-| state.snapshot | protocol, type, state; após autorização ou repetição idempotente |
-| simulation.vote | type, correlationId, mode, sessionId, side ('a' ou 'b') |
-| simulation.reset | type, correlationId, mode, sessionId |
-| state.updated | protocol, type, state, correlationId, effect (vote/side ou reset) |
-| command.rejected | protocol, type, correlationId (ou null se inválido), code |
+| Mensagem             | Campos e finalidade                                               |
+| -------------------- | ----------------------------------------------------------------- |
+| simulation.authorize | type, correlationId, token; primeiro comando da conexão           |
+| state.snapshot       | protocol, type, state; após autorização ou repetição idempotente  |
+| simulation.vote      | type, correlationId, mode, sessionId, side ('a' ou 'b')           |
+| simulation.reset     | type, correlationId, mode, sessionId                              |
+| state.updated        | protocol, type, state, correlationId, effect (vote/side ou reset) |
+| command.rejected     | protocol, type, correlationId (ou null se inválido), code         |
 
 Identificadores de comando/sessão: 16 a 64 caracteres A-Za-z0-9_-. O cliente utiliza crypto.randomUUID. Auth é separada dos comandos de estado e não altera a versão.
 

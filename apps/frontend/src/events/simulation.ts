@@ -1,5 +1,9 @@
 import { sides } from '../config/participants.ts';
-type Target = { dispatch(event: { type: 'vote'; side: 'a' | 'b' } | { type: 'reset' }): void };
+type Target = {
+    dispatch(
+        event: { type: 'vote'; side: 'a' | 'b' } | { type: 'reset' },
+    ): void;
+};
 import type { Elements } from '../components/elements.ts';
 export function bindSimulation(elements: Elements, store: Target) {
     const cleanup: (() => void)[] = [];

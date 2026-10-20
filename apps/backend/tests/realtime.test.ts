@@ -11,23 +11,47 @@ import { attachRealtime } from '../src/realtime/server.ts';
 const token = 'test_token_012345678901234567890123456789';
 const origin = 'http://127.0.0.1:5173';
 function vote(sessionId: string, id = 'command_012345678901', side = 'a') {
-    return { type: 'simulation.vote', correlationId: id, mode: 'simulation', sessionId, side };
+    return {
+        type: 'simulation.vote',
+        correlationId: id,
+        mode: 'simulation',
+        sessionId,
+        side,
+    };
 }
 function reset(sessionId: string, id = 'reset_01234567890123') {
-    return { type: 'simulation.reset', correlationId: id, mode: 'simulation', sessionId };
+    return {
+        type: 'simulation.reset',
+        correlationId: id,
+        mode: 'simulation',
+        sessionId,
+    };
 }
 function next(ws: WebSocket): Promise<any> {
     return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { cleanup(); reject(new Error('Sem mensagem WS')); }, 3000);
+        const timer = setTimeout(() => {
+            cleanup();
+            reject(new Error('Sem mensagem WS'));
+        }, 3000);
         const message = (data: WebSocket.RawData) => {
             cleanup();
-            try { resolve(JSON.parse(data.toString())); } catch (error) { reject(error); }
+            try {
+                resolve(JSON.parse(data.toString()));
+            } catch (error) {
+                reject(error);
+            }
         };
-        const error = (value: Error) => { cleanup(); reject(value); };
+        const error = (value: Error) => {
+            cleanup();
+            reject(value);
+        };
         const cleanup = () => {
-            clearTimeout(timer); ws.off('message', message); ws.off('error', error);
+            clearTimeout(timer);
+            ws.off('message', message);
+            ws.off('error', error);
         };
-        ws.once('message', message); ws.once('error', error);
+        ws.once('message', message);
+        ws.once('error', error);
     });
 }
 async function running(t: { after(fn: () => unknown): void }, enabled = true) {
@@ -35,19 +59,32 @@ async function running(t: { after(fn: () => unknown): void }, enabled = true) {
     const realtime = attachRealtime(server, { enabled, origin, token });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
-    t.after(() => new Promise<void>((resolve, reject) => {
-        realtime.close();
-        server.close((error) => error ? reject(error) : resolve());
-    }));
+    t.after(
+        () =>
+            new Promise<void>((resolve, reject) => {
+                realtime.close();
+                server.close((error) => (error ? reject(error) : resolve()));
+            }),
+    );
     const port = (server.address() as AddressInfo).port;
-    return { ...realtime, url: `ws://127.0.0.1:${port}/realtime`, http: `http://127.0.0.1:${port}` };
+    return {
+        ...realtime,
+        url: `ws://127.0.0.1:${port}/realtime`,
+        http: `http://127.0.0.1:${port}`,
+    };
 }
 async function authorized(url: string) {
     const ws = new WebSocket(url, { origin });
     ws.on('error', () => {});
     await once(ws, 'open');
     const message = next(ws);
-    ws.send(JSON.stringify({ type: 'simulation.authorize', correlationId: 'auth_01234567890123', token }));
+    ws.send(
+        JSON.stringify({
+            type: 'simulation.authorize',
+            correlationId: 'auth_01234567890123',
+            token,
+        }),
+    );
     return { ws, snapshot: await message };
 }
 
@@ -66,9 +103,15 @@ test('sessão inicial, voto fixo +1 autorizado e versão monotônica', () => {
 });
 test('comandos inválidos, campos extras e pontos arbitrários são rejeitados', () => {
     const s = createSimulationSession(true);
-    for (const value of [null, [], {}, { ...vote(s.snapshot().sessionId), amount: 100 },
+    for (const value of [
+        null,
+        [],
+        {},
+        { ...vote(s.snapshot().sessionId), amount: 100 },
         { ...vote(s.snapshot().sessionId), scores: { a: 100, b: 0 } },
-        vote(s.snapshot().sessionId, 'short'), vote(s.snapshot().sessionId, undefined, 'x')]) {
+        vote(s.snapshot().sessionId, 'short'),
+        vote(s.snapshot().sessionId, undefined, 'x'),
+    ]) {
         assert.equal(s.execute(value, true).message.type, 'command.rejected');
     }
     assert.equal(s.snapshot().version, 0);
@@ -78,9 +121,16 @@ test('autorização obrigatória e isolamento de sessão/modo', () => {
     const command = vote(s.snapshot().sessionId);
     assert.equal(s.execute(command, false).changed, false);
     assert.equal(s.execute({ ...command, mode: 'real' }, true).changed, false);
-    assert.equal(s.execute({ ...command, sessionId: 'old_session_012345678' }, true).changed, false);
+    assert.equal(
+        s.execute({ ...command, sessionId: 'old_session_012345678' }, true)
+            .changed,
+        false,
+    );
     const disabled = createSimulationSession(false);
-    assert.equal(disabled.execute(vote(disabled.snapshot().sessionId), true).changed, false);
+    assert.equal(
+        disabled.execute(vote(disabled.snapshot().sessionId), true).changed,
+        false,
+    );
     assert.equal(s.snapshot().version, 0);
 });
 test('identidade é idempotente, conflita se reutilizada e sobrevive ao reset', () => {
@@ -88,7 +138,10 @@ test('identidade é idempotente, conflita se reutilizada e sobrevive ao reset', 
     const command = vote(s.snapshot().sessionId);
     s.execute(command, true);
     assert.equal(s.execute(command, true).changed, false);
-    assert.equal(s.execute({ ...command, side: 'b' }, true).message.type, 'command.rejected');
+    assert.equal(
+        s.execute({ ...command, side: 'b' }, true).message.type,
+        'command.rejected',
+    );
     s.execute(reset(s.snapshot().sessionId), true);
     assert.deepEqual(s.snapshot().scores, { a: 0, b: 0 });
     assert.equal(s.snapshot().version, 2);
@@ -99,16 +152,38 @@ test('limite de identidades não permite replay após saturação', () => {
     const s = createSimulationSession(true, 1);
     const first = vote(s.snapshot().sessionId);
     s.execute(first, true);
-    assert.equal(s.execute(vote(s.snapshot().sessionId, 'new_command_012345678'), true).changed, false);
+    assert.equal(
+        s.execute(vote(s.snapshot().sessionId, 'new_command_012345678'), true)
+            .changed,
+        false,
+    );
     assert.equal(s.execute(first, true).changed, false);
     assert.equal(s.snapshot().scores.a, 1);
 });
 test('reinício gera nova sessão e configuração fora de dev desabilita simulação', () => {
-    assert.notEqual(createSimulationSession(true).snapshot().sessionId, createSimulationSession(true).snapshot().sessionId);
+    assert.notEqual(
+        createSimulationSession(true).snapshot().sessionId,
+        createSimulationSession(true).snapshot().sessionId,
+    );
     assert.equal(readSimulationConfig({}).enabled, false);
-    assert.equal(readSimulationConfig({ NODE_ENV: 'production', SIMULATION_MODE: 'true' }).enabled, false);
-    assert.equal(readSimulationConfig({ NODE_ENV: 'development' }).enabled, false);
-    assert.equal(readSimulationConfig({ NODE_ENV: 'development', SIMULATION_MODE: 'true' }).enabled, true);
+    assert.equal(
+        readSimulationConfig({
+            NODE_ENV: 'production',
+            SIMULATION_MODE: 'true',
+        }).enabled,
+        false,
+    );
+    assert.equal(
+        readSimulationConfig({ NODE_ENV: 'development' }).enabled,
+        false,
+    );
+    assert.equal(
+        readSimulationConfig({
+            NODE_ENV: 'development',
+            SIMULATION_MODE: 'true',
+        }).enabled,
+        true,
+    );
     assert.throws(() => readSimulationConfig({ SIMULATION_TOKEN: 'weak' }));
 });
 
@@ -116,12 +191,16 @@ test('snapshot autorizado, broadcast, deduplicação, reset e reconexão reais',
     const app = await running(t);
     const a = await authorized(app.url);
     const b = await authorized(app.url);
-    t.after(() => { a.ws.terminate(); b.ws.terminate(); });
+    t.after(() => {
+        a.ws.terminate();
+        b.ws.terminate();
+    });
     assert.equal(a.snapshot.type, 'state.snapshot');
     assert.deepEqual(a.snapshot.state.scores, { a: 0, b: 0 });
     const id = a.snapshot.state.sessionId;
     const command = vote(id);
-    const pa = next(a.ws), pb = next(b.ws);
+    const pa = next(a.ws),
+        pb = next(b.ws);
     a.ws.send(JSON.stringify(command));
     const [ma, mb] = await Promise.all([pa, pb]);
     assert.deepEqual(ma, mb);
@@ -130,7 +209,8 @@ test('snapshot autorizado, broadcast, deduplicação, reset e reconexão reais',
     const duplicate = next(a.ws);
     a.ws.send(JSON.stringify(command));
     assert.equal((await duplicate).state.version, 1);
-    const resetA = next(a.ws), resetB = next(b.ws);
+    const resetA = next(a.ws),
+        resetB = next(b.ws);
     b.ws.send(JSON.stringify(reset(id)));
     for (const m of await Promise.all([resetA, resetB])) {
         assert.equal(m.state.version, 2);
@@ -158,7 +238,11 @@ test('origem proibida e simulação desabilitada rejeitam upgrade', async (t) =>
 test('chave inválida e comando anterior à autorização não alteram estado', async (t) => {
     const app = await running(t);
     for (const message of [
-        { type: 'simulation.authorize', correlationId: 'auth_01234567890123', token: 'wrong_token_01234567890123456789012' },
+        {
+            type: 'simulation.authorize',
+            correlationId: 'auth_01234567890123',
+            token: 'wrong_token_01234567890123456789012',
+        },
         vote(app.session.snapshot().sessionId),
     ]) {
         const ws = new WebSocket(app.url, { origin });

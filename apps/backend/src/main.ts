@@ -9,13 +9,17 @@ server.on('error', (error) => {
     process.exitCode = 1;
 });
 let realtime: { close(): void } | undefined;
-if (process.env.NODE_ENV === 'development' && process.env.SIMULATION_MODE === 'true') {
+if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.SIMULATION_MODE === 'true'
+) {
     const { readSimulationConfig } = await import('./realtime/config.ts');
     const { attachRealtime } = await import('./realtime/server.ts');
     const config = readSimulationConfig();
     realtime = attachRealtime(server, config);
     console.log('SIMULAÇÃO LOCAL: autorize a arena com a chave do operador.');
-    if (config.generatedToken) console.log('Chave temporária da simulação:', config.token);
+    if (config.generatedToken)
+        console.log('Chave temporária da simulação:', config.token);
     else console.log('Use a SIMULATION_TOKEN configurada no .env/terminal.');
 }
 server.listen(port, host, () => {
