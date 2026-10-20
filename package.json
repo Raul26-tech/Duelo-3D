@@ -7,7 +7,10 @@
         "node": "^24.15.0",
         "npm": ">=11.0.0"
     },
-    "workspaces": ["apps/frontend", "apps/backend"],
+    "workspaces": [
+        "apps/frontend",
+        "apps/backend"
+    ],
     "scripts": {
         "dev": "node scripts/dev.mjs",
         "dev:frontend": "npm run dev --workspace frontend",

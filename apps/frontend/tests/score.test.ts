@@ -37,9 +37,21 @@ test('reset volta ao início depois de vários votos', () => {
     );
 });
 test('rejeita quantidades inválidas, lado inválido e overflow', () => {
-    for (const amount of [0, -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+    for (const amount of [
+        0,
+        -1,
+        0.5,
+        NaN,
+        Infinity,
+        Number.MAX_SAFE_INTEGER + 1,
+    ])
         assert.throws(
-            () => updateScores(initialScores(), { type: 'vote', side: 'a', amount }),
+            () =>
+                updateScores(initialScores(), {
+                    type: 'vote',
+                    side: 'a',
+                    amount,
+                }),
             RangeError,
         );
     assert.throws(() =>

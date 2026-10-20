@@ -14,6 +14,9 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
+import process from 'node:process';
+import { syncBuiltinESMExports } from 'node:module';
+import { loadOptionalEnv } from '../src/environment.ts';
 
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), 'duelo-root-env-'));
@@ -42,7 +45,6 @@ function probe(
     moduleDir: string,
     cwd: string,
     values: NodeJS.ProcessEnv = {},
-    explicitPath?: string,
 ) {
     const environment = pathToFileURL(join(moduleDir, 'environment.ts')).href;
     const server = pathToFileURL(join(moduleDir, 'server.ts')).href;
@@ -53,7 +55,7 @@ function probe(
             '--eval',
             `import { loadOptionalEnv } from ${JSON.stringify(environment)};
              import { getBackendConfig } from ${JSON.stringify(server)};
-             loadOptionalEnv(${explicitPath === undefined ? '' : JSON.stringify(explicitPath)});
+             loadOptionalEnv();
              console.log(JSON.stringify(getBackendConfig()));`,
         ],
         { cwd, env: childEnv(values), encoding: 'utf8', timeout: 5000 },
@@ -86,7 +88,11 @@ test('backend localiza .env da raiz e ignora arquivos por workspace/cwd', () => 
             join(dirs.root, '.env'),
             'FRONTEND_PORT=5200\nBACKEND_PORT=3201\nBACKEND_HOST=127.0.0.1\n',
         );
-        for (const dir of [dirs.src, join(dirs.root, 'apps/backend'), dirs.other]) {
+        for (const dir of [
+            dirs.src,
+            join(dirs.root, 'apps/backend'),
+            dirs.other,
+        ]) {
             writeFileSync(join(dir, '.env'), 'BACKEND_PORT=9999\n');
         }
         for (const moduleDir of [dirs.src, dirs.dist]) {
@@ -108,20 +114,32 @@ test('backend localiza .env da raiz e ignora arquivos por workspace/cwd', () => 
     }
 });
 
-test('erros diferentes de ENOENT não são ignorados pelo loader', () => {
-    const dirs = fixture();
+test('erros diferentes de ENOENT não são ignorados pelo loader', (t) => {
+    // O SO/API pode retornar ENOENT para arquivo/.env. Injete o erro
+    // para verificar o contrato do loader sem depender desse detalhe.
+    let failure: NodeJS.ErrnoException = new Error('falha controlada');
+    const mocked = t.mock.method(process, 'loadEnvFile', () => {
+        throw failure;
+    });
     try {
-        writeFileSync(join(dirs.root, 'not-a-directory'), 'arquivo');
-        const result = probe(
-            dirs.src,
-            dirs.other,
-            {},
-            join(dirs.root, 'not-a-directory/.env'),
+        // O loader importa o builtin por nome; sincronize seu binding ESM.
+        syncBuiltinESMExports();
+        for (const code of ['EACCES', 'EIO', 'ENOTDIR']) {
+            failure = Object.assign(new Error('falha controlada'), { code });
+            assert.throws(
+                () => loadOptionalEnv('arquivo-de-teste-nao-lido.env'),
+                (error: unknown) => error === failure,
+            );
+        }
+        failure = Object.assign(new Error('arquivo ausente'), {
+            code: 'ENOENT',
+        });
+        assert.doesNotThrow(() =>
+            loadOptionalEnv('arquivo-de-teste-nao-lido.env'),
         );
-        assert.notEqual(result.status, 0);
-        assert.match(result.stderr, /ENOTDIR/);
     } finally {
-        rmSync(dirs.root, { recursive: true, force: true });
+        mocked.mock.restore();
+        syncBuiltinESMExports();
     }
 });
 
@@ -154,7 +172,9 @@ for (const withEnv of [false, true]) {
                 ['--watch', join(dirs.src, 'main.ts')],
                 {
                     cwd: dirs.other,
-                    env: childEnv(withEnv ? {} : { BACKEND_PORT: String(port) }),
+                    env: childEnv(
+                        withEnv ? {} : { BACKEND_PORT: String(port) },
+                    ),
                     stdio: ['ignore', 'pipe', 'pipe'],
                     detached: grouped,
                 },

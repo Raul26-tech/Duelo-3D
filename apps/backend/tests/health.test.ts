@@ -29,7 +29,10 @@ test('GET /health responde 200 com o contrato técnico em loopback', async (t) =
     const base = `http://127.0.0.1:${address.port}`;
     const response = await fetch(`${base}/health`);
     assert.equal(response.status, 200);
-    assert.match(response.headers.get('content-type') ?? '', /application\/json/);
+    assert.match(
+        response.headers.get('content-type') ?? '',
+        /application\/json/,
+    );
     assert.deepEqual(await response.json(), {
         status: 'ok',
         service: 'duelo-3d-backend',

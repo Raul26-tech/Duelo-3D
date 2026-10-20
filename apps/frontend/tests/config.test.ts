@@ -36,10 +36,7 @@ test('sem .env central, preserva defaults, base, strictPort e diretórios', () =
         delete process.env.FRONTEND_PORT;
         const config = createFrontendConfig('development', dirs.configUrl);
         assert.equal(config.base, './');
-        assert.equal(
-            config.root,
-            fileURLToPath(new URL('.', dirs.configUrl)),
-        );
+        assert.equal(config.root, fileURLToPath(new URL('.', dirs.configUrl)));
         assert.equal(
             config.envDir,
             fileURLToPath(new URL('../../', dirs.configUrl)),
@@ -67,10 +64,7 @@ test('loadEnv lê raiz, ignora workspace e preserva prioridade do terminal', () 
             join(dirs.root, '.env'),
             'FRONTEND_PORT=5201\nBACKEND_PORT=3201\nPRIVATE_TOKEN=sentinela\n',
         );
-        writeFileSync(
-            join(dirs.frontend, '.env'),
-            'FRONTEND_PORT=9999\n',
-        );
+        writeFileSync(join(dirs.frontend, '.env'), 'FRONTEND_PORT=9999\n');
         const config = createFrontendConfig('development', dirs.configUrl);
         assert.equal(config.server?.port, 5201);
         assert.doesNotMatch(JSON.stringify(config), /sentinela/);
