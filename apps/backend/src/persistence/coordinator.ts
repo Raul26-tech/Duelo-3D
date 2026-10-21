@@ -12,10 +12,9 @@ export function createScoringCoordinator(
     options: EngineOptions,
     mode: 'create' | 'resume',
 ) {
-    const configuration =
-        createScoringEngine(options).checkpoint().configuration;
+    let configuration = createScoringEngine(options).checkpoint().configuration;
     // Copy and validate caller-owned configuration before opening any scoring operation.
-    const settings: EngineOptions = {
+    let settings: EngineOptions = {
         ...configuration,
         ...(options.enableRealScoring
             ? { enableRealScoring: true as const }
@@ -85,8 +84,22 @@ export function createScoringCoordinator(
             transact((tx) =>
                 tx.initialize(createScoringEngine(settings).checkpoint()),
             );
-        else if (mode !== 'resume')
-            throw new Error('Specify create or resume explicitly');
+        else if (mode === 'resume') {
+            transact((tx) => {
+                const persistedVersion =
+                    tx.load().checkpoint.configuration.rulesVersion;
+                if (
+                    options.rulesVersion !== undefined &&
+                    options.rulesVersion !== persistedVersion
+                )
+                    throw new ScoringIntegrityError(
+                        'rules version differs from the persisted dispute',
+                    );
+                settings = { ...settings, rulesVersion: persistedVersion };
+                configuration =
+                    createScoringEngine(settings).checkpoint().configuration;
+            });
+        } else throw new Error('Specify create or resume explicitly');
         transact(recover);
     } catch (error) {
         store.close();

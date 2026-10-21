@@ -69,7 +69,7 @@ Presentes desconhecidos, perfis não revisados e payloads incompletos ficam em d
 
 ## SQLite, recuperação e concorrência
 
-A biblioteca continua `better-sqlite3@12.10.1`. Bancos novos usam schema 2, com as mesmas quatro tabelas: `dispute`, `journal`, `event_identities`, `gift_sequences`. A extensão permite domínio real, `dispute.source_policy` e `gift_sequences.actor_id`. O fingerprint do journal inclui ator somente em real. Regras anteriores de simulação/observação conservam serialização e resultados (`scoring-v1`).
+A biblioteca continua `better-sqlite3@12.10.1`. Bancos novos usam schema 2, com as mesmas quatro tabelas: `dispute`, `journal`, `event_identities`, `gift_sequences`. A extensão permite domínio real, `dispute.source_policy` e `gift_sequences.actor_id`. O fingerprint do journal inclui ator somente em real. Disputas persistidas com `scoring-v1` conservam serialização, resultados e interpretação somente por nomes. Novas disputas usam `scoring-v2`, acrescentando os tokens completos `13` e `22` no motor compartilhado; toda retomada usa a versão gravada no banco, sem converter a disputa ou recalcular o passado. A versão das regras é independente do schema SQL. Consulte [scoring-engine.md](scoring-engine.md#versão-das-regras-de-comentários-e-replay).
 
 Bancos schema 1 continuam recuperáveis em seus domínios anteriores, sem migração implícita ou habilitação real. Versões desconhecidas, digests divergentes, contexto diferente ou replay incompatível bloqueiam a operação. O domínio real utiliza um banco novo explícito; não reutilize uma disputa experimental como real.
 

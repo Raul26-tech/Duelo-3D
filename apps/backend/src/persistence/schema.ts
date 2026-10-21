@@ -1,5 +1,5 @@
 export const SCHEMA_VERSION = 2;
-export const RULES_VERSION = 'scoring-v1';
+export { CURRENT_RULES_VERSION as RULES_VERSION } from '../scoring/contracts.ts';
 export const APPLICATION_ID = 0x44334450;
 
 export const SCHEMA = `

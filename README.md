@@ -66,7 +66,7 @@ Arquitetura, contratos, limites, exemplos e segurança: [docs/realtime-simulatio
 
 ## Motor de regras — Fase 3
 
-`apps/backend/src/scoring` interpreta comentários com um único candidato, valida presentes pelo catálogo do servidor e controla identidades e combos acumulados. O catálogo padrão é vazio; dados sintéticos existem somente nos testes. O motor mantém as regras de comentários, combos e capacidade. O domínio real exige opt-in interno do servidor; payloads não podem habilitá-lo.
+`apps/backend/src/scoring` interpreta comentários com um único candidato, valida presentes pelo catálogo do servidor e controla identidades e combos acumulados. O catálogo padrão é vazio; dados sintéticos existem somente nos testes. Para novas disputas (`scoring-v2`), comentários reconhecem `Lula`/`13` ou `Flávio`/`Flavio`/`22`, sempre no máximo um ponto; menções aos dois participantes não pontuam. Disputas persistidas com `scoring-v1` conservam as regras anteriores, inclusive na continuação, sem recálculo retroativo. Presentes, combos e capacidade mantêm suas regras. A compatibilidade do replay e os testes dos aliases estão documentados em [docs/validacao-comment-aliases.md](docs/validacao-comment-aliases.md). O domínio real exige opt-in interno do servidor; payloads não podem habilitá-lo.
 
 A simulação WebSocket existente permanece preservada. No modo real, somente callbacks da conexão TikTok autorizada entram no motor; o navegador recebe snapshots/atualizações e não pode votar ou reinicializar a disputa.
 

@@ -6,7 +6,9 @@ import type {
     EngineCheckpoint,
     GiftEvent,
     Snapshot,
+    RulesVersion,
 } from './contracts.ts';
+import { CURRENT_RULES_VERSION } from './contracts.ts';
 import { createGiftCatalog, DEFAULT_GIFT_CATALOG } from './catalog.ts';
 import { interpretComment } from './comments.ts';
 import {
@@ -29,6 +31,7 @@ export type EngineOptions = Readonly<{
     domain: Domain;
     catalog?: unknown;
     capacity?: number;
+    rulesVersion?: RulesVersion;
     /** Server-only opt-in. It is not parsed from an event. */
     enableRealScoring?: true;
     sourcePolicy?: string;
@@ -43,11 +46,13 @@ export function createScoringEngine(
     const roomId = normalizeId(options.roomId);
     const domain = options.domain;
     const capacity = options.capacity ?? 10_000;
+    const rulesVersion = options.rulesVersion ?? CURRENT_RULES_VERSION;
     if (
         typeof sessionId !== 'string' ||
         !normalizeId(sessionId) ||
         !origin ||
         !roomId ||
+        (rulesVersion !== 'scoring-v1' && rulesVersion !== 'scoring-v2') ||
         (!['simulation', 'observation'].includes(domain) &&
             !(domain === 'real' && options.enableRealScoring === true)) ||
         (options.sourcePolicy !== undefined &&
@@ -142,7 +147,7 @@ export function createScoringEngine(
         let points: number;
         let nextSequence: Sequence | undefined;
         if (event.type === 'comment') {
-            candidate = interpretComment(event.text);
+            candidate = interpretComment(event.text, rulesVersion);
             points = 1;
             if (!candidate) {
                 remember();
@@ -226,6 +231,7 @@ export function createScoringEngine(
         roomId,
         domain,
         capacity,
+        rulesVersion,
         ...(options.sourcePolicy !== undefined
             ? { sourcePolicy: options.sourcePolicy }
             : {}),

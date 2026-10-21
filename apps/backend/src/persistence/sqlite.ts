@@ -34,10 +34,24 @@ type Metadata = {
     journal_count: number;
     digest: string;
 };
-const digest = (data: StoredScoring) =>
-    createHash('sha256')
-        .update(JSON.stringify({ rules: RULES_VERSION, ...data }))
+const digest = (data: StoredScoring) => {
+    const { rulesVersion, ...legacyConfiguration } =
+        data.checkpoint.configuration;
+    // Preserve the exact v1 digest format; never rewrite historical decisions as v2.
+    const checkpoint =
+        rulesVersion === 'scoring-v1'
+            ? { ...data.checkpoint, configuration: legacyConfiguration }
+            : data.checkpoint;
+    return createHash('sha256')
+        .update(
+            JSON.stringify({
+                rules: rulesVersion,
+                checkpoint,
+                journal: data.journal,
+            }),
+        )
         .digest('hex');
+};
 const compareIdentity = (a: { identity: string }, b: { identity: string }) =>
     a.identity < b.identity ? -1 : a.identity > b.identity ? 1 : 0;
 
@@ -124,7 +138,8 @@ class SqliteScoringStore implements ScoringStore {
                 .all() as Metadata[];
             if (rows.length !== 1) throw new Error('missing dispute');
             const meta = rows[0];
-            if (meta.rules_version !== RULES_VERSION)
+            const rulesVersion = meta.rules_version;
+            if (rulesVersion !== 'scoring-v1' && rulesVersion !== RULES_VERSION)
                 throw new Error('unsupported rules version');
             const journalRows = this.db
                 .prepare(
@@ -180,6 +195,7 @@ class SqliteScoringStore implements ScoringStore {
                     roomId: meta.room_id,
                     domain: meta.domain,
                     capacity: meta.capacity,
+                    rulesVersion,
                     ...(meta.source_policy != null
                         ? { sourcePolicy: meta.source_policy }
                         : {}),
@@ -239,7 +255,7 @@ class SqliteScoringStore implements ScoringStore {
                     config.domain,
                     config.capacity,
                     JSON.stringify(config.catalog),
-                    RULES_VERSION,
+                    config.rulesVersion,
                     state.version,
                     state.scores.lula,
                     state.scores.flavio,
@@ -362,6 +378,8 @@ export function openSqliteScoring(options: {
             store,
             {
                 ...configuration,
+                // Omitted means adopt the persisted version on resume, not force current rules.
+                rulesVersion: options.engine.rulesVersion,
                 catalog: configuration.catalog,
                 ...(options.engine.enableRealScoring
                     ? { enableRealScoring: true as const }

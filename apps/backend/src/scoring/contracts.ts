@@ -1,5 +1,7 @@
 /** Server-internal contracts. These are not browser commands or platform payloads. */
 export type Candidate = 'lula' | 'flavio';
+export type RulesVersion = 'scoring-v1' | 'scoring-v2';
+export const CURRENT_RULES_VERSION: RulesVersion = 'scoring-v2';
 export type Domain = 'simulation' | 'observation' | 'real';
 export type Identity = Readonly<{
     origin: string;
@@ -53,6 +55,7 @@ export type EngineConfiguration = Readonly<{
     roomId: string;
     domain: Domain;
     capacity: number;
+    rulesVersion: RulesVersion;
     sourcePolicy?: string;
     catalog: readonly GiftRule[];
 }>;
