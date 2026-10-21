@@ -81,3 +81,16 @@ Veja [docs/validacao-scoring-engine.md](docs/validacao-scoring-engine.md) para o
 Biblioteca: better-sqlite3 12.10.1, validada com Node 24.15.0. O banco padrão fica em `~/.local/state/duelo-3d/scoring.sqlite`, fora do repositório; criação e retomada são operações explícitas da API interna. `npm run dev` continua iniciando a simulação existente sem criar banco.
 
 Arquitetura, esquema, exemplo e recuperação: [docs/scoring-persistence.md](docs/scoring-persistence.md). Resultados e limitações: [docs/validacao-scoring-persistence.md](docs/validacao-scoring-persistence.md).
+
+## TikTok LIVE — diagnóstico da Fase 5.1
+
+Adaptador independente, com `tiktok-live-connector@2.5.0`, somente para observação. Desligado por padrão; não altera placar, SQLite, simulação ou arena. Eventos normalizados nunca são elegíveis para pontuação nesta fase.
+
+```bash
+# Padrão seguro: termina desligado, sem conectar
+TIKTOK_DIAGNOSTIC_ENABLED=false npm run diagnose:tiktok
+```
+
+Para diagnóstico real posterior, configurar opt-in e handle no `.env` central e executar o mesmo comando em terminal dedicado. A execução é limitada a cinco minutos e possui logs pseudonimizados e encerramento por Ctrl+C. `npm run dev` continua independente do conector.
+
+Contratos, campos inspecionados, incertezas de combos, serviço de assinatura e roteiro de LIVE: [docs/tiktok-live-diagnostic.md](docs/tiktok-live-diagnostic.md). Resultados: [docs/validacao-tiktok-diagnostic.md](docs/validacao-tiktok-diagnostic.md). Nenhuma LIVE foi validada nesta entrega.

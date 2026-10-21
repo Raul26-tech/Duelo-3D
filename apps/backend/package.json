@@ -10,7 +10,8 @@
         "dev": "node --watch src/dev.ts",
         "build": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
         "start": "node dist/main.js",
-        "test": "node --test tests/*.test.ts"
+        "test": "node --test tests/*.test.ts",
+        "diagnose:tiktok": "node src/tiktok/main.ts"
     },
     "devDependencies": {
         "@types/better-sqlite3": "9.6.0",
@@ -20,6 +21,7 @@
     },
     "dependencies": {
         "better-sqlite3": "12.10.1",
+        "tiktok-live-connector": "2.5.0",
         "ws": "8.22.0"
     }
 }
