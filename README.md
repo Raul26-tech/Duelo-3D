@@ -104,3 +104,9 @@ Contratos, campos inspecionados, incertezas de combos, serviço de assinatura e 
 Para uma disputa real autorizada, configure as variáveis documentadas no `.env.example`, incluindo `DUEL_MODE=real`, `TIKTOK_REAL_ENABLED=true`, identidade revisada, conta, sala, banco e ação `create` ou `resume`. Depois execute `npm run dev`. O `.env` nunca vai para o navegador. Não habilite real apenas para experimentar a instalação; primeiro siga o roteiro de revisão e teste controlado. Não foram enviados comentários ou presentes, nem iniciada uma LIVE durante a implementação.
 
 O catálogo é um JSON externo opcional; `config/gift-catalog.example.json` começa com `[]`. Cada entrada exige ID efetivo, participante, inteiro positivo seguro e entrega revisada. Não há associações predefinidas. Bancos e logs devem ficar fora do projeto. Reinícios exigem `resume`, mesmo contexto e mesma política; recuperação insegura bloqueia o processamento. Não existe reset ou administração de disputa real pela arena.
+
+## Preparação de presentes — Fase 5.3
+
+A referência dos 14 presentes está em `config/gift-catalog.reference.json`: cinco IDs observados em LIVE conforme relato do operador e nove provisórios externos. Nenhum tem entrega revisada ou aprovação automática. O catálogo operacional inicial permanece `[]`, sem alterar modo real ou disputas existentes.
+
+Use `npm run catalog:gifts -- list`, `template`, `validate`, `prepare` e `verify` para a revisão local e geração exclusiva de arquivo novo. O diagnóstico existente possui um relatório agregado opcional de presentes, sem pontuação e sem dados pessoais. Procedimentos, campos e limitações: [docs/gift-catalog-validation.md](docs/gift-catalog-validation.md).

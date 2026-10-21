@@ -2,6 +2,10 @@ import { loadOptionalEnv } from '../environment.ts';
 import { readDiagnosticConfig } from './config.ts';
 import { createDiagnosticLogger, createEventObserver } from './diagnostics.ts';
 import { createDiagnosticClient } from './client.ts';
+import { createGiftReport, withGiftReport } from './gift-report.ts';
+import { reserveLocalJson } from '../local-json.ts';
+
+let reportFile: ReturnType<typeof reserveLocalJson> | undefined;
 
 const logger = createDiagnosticLogger((line) => {
     // Avoid unbounded stdout buffering when a consumer is slow.
@@ -14,7 +18,15 @@ try {
     if (!config.enabled) logger.lifecycle('disabled', 0);
     else {
         const { createProviderFactory } = await import('./provider.ts');
-        const observer = createEventObserver(logger);
+        const report = process.env.TIKTOK_GIFT_REPORT
+            ? createGiftReport()
+            : undefined;
+        if (report)
+            reportFile = reserveLocalJson(process.env.TIKTOK_GIFT_REPORT!);
+        const baseObserver = createEventObserver(logger);
+        const observer = report
+            ? withGiftReport(baseObserver, report)
+            : baseObserver;
         const client = createDiagnosticClient({
             enabled: true,
             factory: await createProviderFactory(config),
@@ -40,6 +52,14 @@ try {
             );
             force.unref();
             await client.stop();
+            try {
+                if (report) reportFile?.save(report.snapshot());
+            } catch {
+                process.stderr.write(
+                    '{"category":"gift_report_write_failed","domain":"observation","scoringEligible":false}\n',
+                );
+                process.exitCode = 1;
+            }
             if (
                 [
                     'retry_exhausted',
@@ -75,6 +95,7 @@ try {
         client.start();
     }
 } catch {
+    reportFile?.cancel();
     // Configuration/provider errors can contain credentials: never serialize their content.
     process.stderr.write(
         '{"category":"diagnostic_start_failed","domain":"observation","scoringEligible":false}\n',

@@ -1,0 +1,114 @@
+[
+    {
+        "giftId": "5655",
+        "name": "Rose",
+        "candidate": "lula",
+        "points": 2,
+        "provenance": "operator-reported-live",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "5487",
+        "name": "Finger Heart",
+        "candidate": "lula",
+        "points": 10,
+        "provenance": "operator-reported-live",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "5576",
+        "name": "Heart",
+        "candidate": "lula",
+        "points": 20,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "5879",
+        "name": "Doughnut",
+        "candidate": "lula",
+        "points": 50,
+        "provenance": "operator-reported-live",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "5585",
+        "name": "Confetti",
+        "candidate": "lula",
+        "points": 200,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "7168",
+        "name": "Money Gun",
+        "candidate": "lula",
+        "points": 1000,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "6364",
+        "name": "Galaxy",
+        "candidate": "lula",
+        "points": 10000,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "8239",
+        "name": "White Rose",
+        "candidate": "flavio",
+        "points": 2,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "19447",
+        "name": "Overreact",
+        "candidate": "flavio",
+        "points": 10,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "6560",
+        "name": "Tiny Diny",
+        "candidate": "flavio",
+        "points": 20,
+        "provenance": "operator-reported-live",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "14488",
+        "name": "Capybara",
+        "candidate": "flavio",
+        "points": 50,
+        "provenance": "operator-reported-live",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "6968",
+        "name": "Hand Heart",
+        "candidate": "flavio",
+        "points": 200,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "9948",
+        "name": "You're Amazing",
+        "candidate": "flavio",
+        "points": 1000,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    },
+    {
+        "giftId": "6781",
+        "name": "Watermelon Love",
+        "candidate": "flavio",
+        "points": 10000,
+        "provenance": "external-unconfirmed",
+        "deliveryStatus": "unreviewed"
+    }
+]
