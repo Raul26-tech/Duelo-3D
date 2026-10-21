@@ -3,6 +3,7 @@ import type {
     Candidate,
     Decision,
     Domain,
+    EngineCheckpoint,
     GiftEvent,
     Snapshot,
 } from './contracts.ts';
@@ -30,12 +31,17 @@ export type EngineOptions = Readonly<{
 }>;
 
 /** In-memory, server-internal simulation/observation engine. No real scoring ingress. */
-export function createScoringEngine(options: EngineOptions) {
+export function createScoringEngine(
+    options: EngineOptions,
+    sessionId: string = randomUUID(),
+) {
     const origin = normalizeId(options.origin);
     const roomId = normalizeId(options.roomId);
     const domain = options.domain;
     const capacity = options.capacity ?? 10_000;
     if (
+        typeof sessionId !== 'string' ||
+        !normalizeId(sessionId) ||
         !origin ||
         !roomId ||
         !['simulation', 'observation'].includes(domain) ||
@@ -47,7 +53,6 @@ export function createScoringEngine(options: EngineOptions) {
             'Invalid scoring engine configuration; real scoring is disabled',
         );
     const catalog = createGiftCatalog(options.catalog ?? DEFAULT_GIFT_CATALOG);
-    const sessionId = randomUUID();
     let version = 0;
     let scores = { lula: 0, flavio: 0 };
     const events = new Map<string, string>();
@@ -203,5 +208,35 @@ export function createScoringEngine(options: EngineOptions) {
         version += 1;
         return result('applied', 'SCORED', identity, candidate, points);
     }
-    return Object.freeze({ process, snapshot });
+    const configuration = Object.freeze({
+        origin,
+        roomId,
+        domain,
+        capacity,
+        catalog: Object.freeze(
+            [...catalog.values()].sort((a, b) =>
+                a.giftId < b.giftId ? -1 : a.giftId > b.giftId ? 1 : 0,
+            ),
+        ),
+    });
+    const checkpoint = (): EngineCheckpoint =>
+        Object.freeze({
+            configuration,
+            state: snapshot(),
+            events: Object.freeze(
+                [...events]
+                    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+                    .map(([identity, fingerprint]) =>
+                        Object.freeze({ identity, fingerprint }),
+                    ),
+            ),
+            sequences: Object.freeze(
+                [...sequences]
+                    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+                    .map(([identity, sequence]) =>
+                        Object.freeze({ identity, ...sequence }),
+                    ),
+            ),
+        });
+    return Object.freeze({ process, snapshot, checkpoint });
 }

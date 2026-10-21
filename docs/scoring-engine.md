@@ -99,6 +99,6 @@ node --test apps/backend/tests/scoring.test.ts
 
 Os serviços existentes continuam em `http://127.0.0.1:5173` e `http://127.0.0.1:3000/health`; configuração opcional somente no `.env` da raiz. A chave da simulação continua sendo informada à arena pelo operador.
 
-O motor é determinístico nas decisões para uma sequência de eventos/configuração; o identificador de sessão é gerado pelo servidor. Não há persistência. Reiniciar ou construir nova instância perde placar, sequências e identidades. Isso não permite retomada automática segura de disputa real.
+O motor é determinístico nas decisões para uma sequência de eventos/configuração; o identificador de sessão é gerado pelo servidor. A criação direta por `createScoringEngine` continua em memória: reiniciar ou construir nova instância perde placar, sequências e identidades. Para recuperação transacional optativa, a Fase 4 acrescenta `openSqliteScoring`, descrito em [scoring-persistence.md](scoring-persistence.md). Isso não permite retomada automática segura de disputa real.
 
-Esta fase não habilita comentários/presentes na arena. Integração com fonte externa, verificação factual de catálogo, persistência e autoridade de disputa real exigem etapas futuras autorizadas.
+Esta fase não habilita comentários/presentes na arena. Integração com fonte externa, verificação factual de catálogo e autoridade de disputa real exigem etapas futuras autorizadas.
