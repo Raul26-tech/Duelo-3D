@@ -46,7 +46,7 @@ const expected = [
     ['Confetti', '5585', 'lula', 200, 'external-unconfirmed'],
     ['Money Gun', '7168', 'lula', 1000, 'external-unconfirmed'],
     ['Galaxy', '6364', 'lula', 10000, 'external-unconfirmed'],
-    ['White Rose', '8239', 'flavio', 2, 'external-unconfirmed'],
+    ['White Rose', '8239', 'flavio', 2, 'operator-reported-live'],
     ['Overreact', '19447', 'flavio', 10, 'external-unconfirmed'],
     ['Tiny Diny', '6560', 'flavio', 20, 'operator-reported-live'],
     ['Capybara', '14488', 'flavio', 50, 'operator-reported-live'],
@@ -132,19 +132,19 @@ test('referência preserva os 14 nomes, IDs, candidatos e pontos do operador', (
         (reference[0] as { points: number }).points = 999;
     });
 });
-test('cinco IDs observados e nove provisórios nunca implicam entrega ou aprovação', () => {
+test('seis IDs observados e oito IDs históricos não confirmados nunca implicam entrega ou aprovação', () => {
     assert.equal(
         reference.filter((gift) => gift.provenance === 'operator-reported-live')
             .length,
-        5,
+        6,
     );
     assert.equal(
         reference.filter((gift) => gift.provenance === 'external-unconfirmed')
             .length,
-        9,
+        8,
     );
     const reviews = reviewTemplate(reference);
-    assert.equal(reviews.filter((review) => review.idConfirmed).length, 5);
+    assert.equal(reviews.filter((review) => review.idConfirmed).length, 6);
     assert.ok(
         reviews.every(
             (review) =>

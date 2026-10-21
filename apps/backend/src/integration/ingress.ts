@@ -1,10 +1,22 @@
+import { giftRuleKey, matchGift } from '../scoring/catalog.ts';
 import type { ScoringEvent } from '../scoring/contracts.ts';
 import { normalizeProviderEvent } from '../tiktok/normalize.ts';
 import type { ReviewedGift } from './config.ts';
 
 export const TIKTOK_ORIGIN = 'tiktok-live-connector@2.5.0';
 export type IngressResult =
-    { event: ScoringEvent; reason?: never } | { event?: never; reason: string };
+    | {
+          event: ScoringEvent;
+          matchReason?: string;
+          matchMode?: 'id' | 'exact-name';
+          reason?: never;
+      }
+    | {
+          event?: never;
+          matchReason?: never;
+          matchMode?: 'id' | 'exact-name';
+          reason: string;
+      };
 
 /** Called ONLY with raw callbacks from our active, connected provider. Not a network API.
  * Observation envelopes cannot be promoted by changing their domain.
@@ -46,7 +58,29 @@ export function validateRealOccurrence(
     };
     if (kind === 'comment')
         return { event: { ...identity, type: 'comment', text: c.text! } };
-    const rule = gifts.find((entry) => entry.giftId === c.giftId);
+    const matched = matchGift(gifts, c.giftId!, c.giftName);
+    const rule = matched.rule as ReviewedGift | undefined;
+    // New catalogs use a self-identifying journal extension. Legacy journal shape remains
+    // recoverable; new receipt still rejects a contradictory received name.
+    const modern =
+        gifts.some((gift) => gift.match !== undefined) ||
+        matched.reason === 'ID_NAME_CONFLICT' ||
+        matched.reason === 'AMBIGUOUS_GIFT';
+    const extension = modern
+        ? {
+              giftPolicy: 'hybrid-v1' as const,
+              giftName: c.giftName,
+              giftRuleId: rule ? giftRuleKey(rule) : null,
+          }
+        : {};
+    const matchInfo = {
+        matchReason: matched.reason,
+        ...(rule
+            ? { matchMode: rule.match ?? ('id' as const) }
+            : matched.reason === 'ID_NAME_CONFLICT'
+              ? { matchMode: 'id' as const }
+              : {}),
+    };
     // A complete unknown gift is submitted only for the engine's durable UNKNOWN_GIFT
     // rejection, so a contradictory later payload cannot reuse its admitted identity.
     // No catalog entry means no possible points, regardless of this structural delivery.
@@ -60,12 +94,17 @@ export function validateRealOccurrence(
             c.repeatCount !== 1 ||
             c.repeatEnd !== 1
         )
-            return { reason: 'UNPROVEN_SINGLE_DELIVERY' };
+            return {
+                reason: 'DELIVERY_NOT_VALIDATED',
+                matchMode: rule?.match ?? 'id',
+            };
         return {
+            ...matchInfo,
             event: {
                 ...identity,
                 type: 'gift',
                 giftId: c.giftId!,
+                ...extension,
                 delivery: { kind: 'single', quantity: 1 },
             },
         };
@@ -77,12 +116,17 @@ export function validateRealOccurrence(
         c.repeatCount === null ||
         c.repeatEnd === null
     )
-        return { reason: 'UNPROVEN_COMBO_LIFECYCLE' };
+        return {
+            reason: 'DELIVERY_NOT_VALIDATED',
+            matchMode: rule?.match ?? 'id',
+        };
     return {
+        ...matchInfo,
         event: {
             ...identity,
             type: 'gift',
             giftId: c.giftId!,
+            ...extension,
             delivery: {
                 kind: 'combo',
                 sequenceId: c.sequenceId,

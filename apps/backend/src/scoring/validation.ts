@@ -63,9 +63,42 @@ export function parseEvent(value: unknown): ScoringEvent | null {
     }
     if (
         value.type !== 'gift' ||
-        !exact(value, [...common, 'giftId', 'delivery'])
+        !exact(value, [
+            ...common,
+            'giftId',
+            'delivery',
+            ...(Object.hasOwn(value, 'giftPolicy')
+                ? ['giftPolicy', 'giftName', 'giftRuleId']
+                : []),
+        ])
     )
         return null;
+    const hybrid = Object.hasOwn(value, 'giftPolicy');
+    if (
+        hybrid &&
+        (value.domain !== 'real' ||
+            value.giftPolicy !== 'hybrid-v1' ||
+            !(
+                value.giftName === null ||
+                (typeof value.giftName === 'string' &&
+                    value.giftName.length > 0 &&
+                    value.giftName.length <= 256 &&
+                    !/[\u0000-\u001f\u007f]/u.test(value.giftName))
+            ) ||
+            !(
+                value.giftRuleId === null ||
+                (typeof value.giftRuleId === 'string' &&
+                    normalizeId(value.giftRuleId))
+            ))
+    )
+        return null;
+    const extension = hybrid
+        ? {
+              giftPolicy: 'hybrid-v1' as const,
+              giftName: value.giftName as string | null,
+              giftRuleId: value.giftRuleId as string | null,
+          }
+        : {};
     const giftId = normalizeId(value.giftId);
     const delivery = value.delivery;
     if (!giftId || !record(delivery)) return null;
@@ -78,6 +111,7 @@ export function parseEvent(value: unknown): ScoringEvent | null {
             ...identity,
             type: 'gift',
             giftId,
+            ...extension,
             delivery: { kind: 'single', quantity: 1 },
         };
     }
@@ -96,6 +130,7 @@ export function parseEvent(value: unknown): ScoringEvent | null {
         ...identity,
         type: 'gift',
         giftId,
+        ...extension,
         delivery: {
             kind: 'combo',
             sequenceId,
@@ -134,6 +169,9 @@ export function fingerprint(event: ScoringEvent): string {
                       : null,
                   event.delivery.kind === 'combo' ? event.delivery.final : null,
                   ...(event.domain === 'real' ? [event.actorId] : []),
+                  ...(event.giftPolicy
+                      ? [event.giftPolicy, event.giftName, event.giftRuleId]
+                      : []),
               ],
     );
 }
