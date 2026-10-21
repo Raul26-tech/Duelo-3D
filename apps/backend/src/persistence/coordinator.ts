@@ -17,6 +17,9 @@ export function createScoringCoordinator(
     // Copy and validate caller-owned configuration before opening any scoring operation.
     const settings: EngineOptions = {
         ...configuration,
+        ...(options.enableRealScoring
+            ? { enableRealScoring: true as const }
+            : {}),
         catalog: configuration.catalog,
     };
     let closed = false;

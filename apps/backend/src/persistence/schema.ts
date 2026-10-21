@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const RULES_VERSION = 'scoring-v1';
 export const APPLICATION_ID = 0x44334450;
 
@@ -8,7 +8,8 @@ CREATE TABLE dispute (
     session_id TEXT NOT NULL UNIQUE,
     origin TEXT NOT NULL,
     room_id TEXT NOT NULL,
-    domain TEXT NOT NULL CHECK (domain IN ('simulation', 'observation')),
+    domain TEXT NOT NULL CHECK (domain IN ('simulation', 'observation', 'real')),
+    source_policy TEXT,
     capacity INTEGER NOT NULL CHECK (capacity BETWEEN 1 AND 10000),
     catalog_json TEXT NOT NULL CHECK (json_valid(catalog_json)),
     rules_version TEXT NOT NULL,
@@ -35,6 +36,7 @@ CREATE TABLE gift_sequences (
     session_id TEXT NOT NULL REFERENCES dispute(session_id) DEFERRABLE INITIALLY DEFERRED,
     identity TEXT NOT NULL,
     gift_id TEXT NOT NULL,
+    actor_id TEXT,
     quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 9007199254740991),
     final INTEGER NOT NULL CHECK (final IN (0, 1)),
     invalid INTEGER NOT NULL CHECK (invalid IN (0, 1)),

@@ -3,13 +3,22 @@ import { loadOptionalEnv } from './environment.ts';
 
 loadOptionalEnv();
 const { port, host } = getBackendConfig();
-const server = createBackendServer();
+const mode = process.env.DUEL_MODE ?? 'simulation';
+if (!['simulation', 'observation', 'real'].includes(mode))
+    throw new Error('Invalid DUEL_MODE');
+if (mode !== 'real' && process.env.TIKTOK_REAL_ENABLED === 'true')
+    throw new Error('Real scoring requires DUEL_MODE=real');
+const server = createBackendServer(
+    mode as 'simulation' | 'observation' | 'real',
+);
 server.on('error', (error) => {
     console.error('Falha ao iniciar backend:', error.message);
     process.exitCode = 1;
+    void stop();
 });
-let realtime: { close(): void } | undefined;
+let realtime: { close(): void | Promise<void> } | undefined;
 if (
+    mode === 'simulation' &&
     process.env.NODE_ENV === 'development' &&
     process.env.SIMULATION_MODE === 'true'
 ) {
@@ -22,15 +31,71 @@ if (
         console.log('Chave temporária da simulação:', config.token);
     else console.log('Use a SIMULATION_TOKEN configurada no .env/terminal.');
 }
+if (mode === 'real' || mode === 'observation') {
+    // Dynamic imports keep the default simulation and health entrypoints independent of the SDK.
+    const { createProviderFactory } = await import('./tiktok/provider.ts');
+    const { readDiagnosticConfig } = await import('./tiktok/config.ts');
+    const write = (line: string) => {
+        if (process.stdout.writableLength < 65536)
+            process.stdout.write(line + '\n');
+    };
+    if (mode === 'real') {
+        const { readRealConfig } = await import('./integration/config.ts');
+        const { startRealRuntime } = await import('./integration/runtime.ts');
+        const config = readRealConfig();
+        const factory = await createProviderFactory({
+            enabled: true,
+            username: config.username,
+            signApiKey: config.signApiKey,
+        });
+        const { resolvePort } = await import('./server.ts');
+        const frontendPort = resolvePort(process.env.FRONTEND_PORT ?? '5173');
+        realtime = startRealRuntime({
+            server,
+            origin: `http://127.0.0.1:${frontendPort}`,
+            config,
+            factory,
+            writeDiagnostic: write,
+        });
+        console.log(
+            'REAL: arena somente leitura; fonte TikTok e disputa persistida vinculadas.',
+        );
+    } else {
+        const config = readDiagnosticConfig();
+        if (!config.enabled)
+            throw new Error(
+                'Observation requires TIKTOK_DIAGNOSTIC_ENABLED=true',
+            );
+        const { createDiagnosticClient } = await import('./tiktok/client.ts');
+        const { createDiagnosticLogger, createEventObserver } =
+            await import('./tiktok/diagnostics.ts');
+        const logger = createDiagnosticLogger(write);
+        const observer = createEventObserver(logger);
+        const client = createDiagnosticClient({
+            enabled: true,
+            factory: await createProviderFactory(config),
+            logger,
+            observer,
+        });
+        const timer = setInterval(() => observer.tick(), 1000);
+        client.start();
+        realtime = {
+            async close() {
+                clearInterval(timer);
+                await client.stop();
+            },
+        };
+    }
+}
 server.listen(port, host, () => {
     const address = host === '::1' ? '[::1]' : host;
     console.log(`Backend: http://${address}:${port}/health`);
 });
 let stopping = false;
-function stop() {
+async function stop() {
     if (stopping) return;
     stopping = true;
-    realtime?.close();
+    await realtime?.close();
     server.close((error) => {
         if (error) {
             console.error(error.message);
@@ -38,5 +103,5 @@ function stop() {
         }
     });
 }
-process.on('SIGINT', stop);
-process.on('SIGTERM', stop);
+process.on('SIGINT', () => void stop());
+process.on('SIGTERM', () => void stop());

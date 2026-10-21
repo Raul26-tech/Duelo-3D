@@ -1,11 +1,13 @@
 /** Server-internal contracts. These are not browser commands or platform payloads. */
 export type Candidate = 'lula' | 'flavio';
-export type Domain = 'simulation' | 'observation';
+export type Domain = 'simulation' | 'observation' | 'real';
 export type Identity = Readonly<{
     origin: string;
     roomId: string;
     domain: Domain;
     eventId: string;
+    /** Required for real source attribution; never supplied by browser commands. */
+    actorId?: string;
 }>;
 export type CommentEvent = Identity &
     Readonly<{ type: 'comment'; text: string }>;
@@ -51,6 +53,7 @@ export type EngineConfiguration = Readonly<{
     roomId: string;
     domain: Domain;
     capacity: number;
+    sourcePolicy?: string;
     catalog: readonly GiftRule[];
 }>;
 export type EngineCheckpoint = Readonly<{
@@ -60,6 +63,7 @@ export type EngineCheckpoint = Readonly<{
     sequences: readonly Readonly<{
         identity: string;
         giftId: string;
+        actorId?: string;
         quantity: number;
         final: boolean;
         invalid: boolean;

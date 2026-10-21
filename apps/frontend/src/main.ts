@@ -25,7 +25,33 @@ authorize.type = 'button';
 authorize.textContent = 'Autorizar simulação';
 indicator.append(label, ' ', authorize);
 document.querySelector('main')?.append(indicator);
-const url = new URL('/realtime', window.location.href);
+for (const side of sides) elements.fighters[side].vote.disabled = true;
+elements.reset.disabled = true;
+let mode: 'simulation' | 'observation' | 'real' | null = null;
+try {
+    const response = await fetch('/arena/mode', {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+    });
+    const value: unknown = await response.json();
+    if (
+        response.ok &&
+        value &&
+        typeof value === 'object' &&
+        'mode' in value &&
+        (value.mode === 'simulation' ||
+            value.mode === 'observation' ||
+            value.mode === 'real')
+    )
+        mode = value.mode;
+} catch {
+    /* Keep controls disabled if the authority cannot be identified. */
+}
+authorize.hidden = mode !== 'simulation';
+const url = new URL(
+    mode === 'real' ? '/arena' : '/realtime',
+    window.location.href,
+);
 url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const names = {
     disconnected:
@@ -36,11 +62,19 @@ const names = {
 };
 const client = createRealtimeClient({
     url: url.href,
+    mode: mode === 'real' ? 'real' : 'simulation',
     onStatus(status) {
-        label.textContent = names[status];
+        label.textContent =
+            mode === 'real'
+                ? status === 'connected'
+                    ? 'Conectado ao backend — disputa real; controles somente leitura.'
+                    : 'Disputa real desconectada — último placar pode estar desatualizado.'
+                : names[status];
         for (const side of sides)
-            elements.fighters[side].vote.disabled = status !== 'connected';
-        elements.reset.disabled = status !== 'connected';
+            elements.fighters[side].vote.disabled =
+                status !== 'connected' || mode !== 'simulation';
+        elements.reset.disabled =
+            status !== 'connected' || mode !== 'simulation';
     },
     onRejected(code) {
         label.textContent = `Simulação: comando rejeitado (${code}).`;
@@ -63,8 +97,15 @@ const client = createRealtimeClient({
 });
 for (const side of sides) elements.fighters[side].vote.disabled = true;
 elements.reset.disabled = true;
-label.textContent = names.disconnected;
+label.textContent =
+    mode === 'observation'
+        ? 'Observação TikTok — sem pontuação.'
+        : mode === null
+          ? 'Backend indisponível. Controles desabilitados.'
+          : names.disconnected;
+if (mode === 'real') client.startReadonly();
 const onAuthorize = () => {
+    if (mode !== 'simulation') return;
     const token = window.prompt(
         'Cole a chave de simulação mostrada no terminal do backend (ou configurada no .env).',
     );

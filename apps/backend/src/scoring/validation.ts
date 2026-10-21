@@ -30,10 +30,17 @@ export function normalizeId(value: unknown): string | null {
 export function parseEvent(value: unknown): ScoringEvent | null {
     if (
         !record(value) ||
-        (value.domain !== 'simulation' && value.domain !== 'observation')
+        (value.domain !== 'simulation' &&
+            value.domain !== 'observation' &&
+            value.domain !== 'real')
     )
         return null;
     const common = ['origin', 'roomId', 'domain', 'eventId', 'type'];
+    const actorId = value.domain === 'real' ? normalizeId(value.actorId) : null;
+    if (value.domain === 'real') {
+        if (!actorId) return null;
+        common.push('actorId');
+    }
     const origin = normalizeId(value.origin);
     const roomId = normalizeId(value.roomId);
     const eventId = normalizeId(value.eventId);
@@ -42,6 +49,7 @@ export function parseEvent(value: unknown): ScoringEvent | null {
         origin,
         roomId,
         eventId,
+        ...(actorId ? { actorId } : {}),
         domain: value.domain as ScoringEvent['domain'],
     };
     if (value.type === 'comment') {
@@ -111,7 +119,11 @@ export function eventIdentity(event: ScoringEvent): string {
 export function fingerprint(event: ScoringEvent): string {
     return JSON.stringify(
         event.type === 'comment'
-            ? [event.type, event.text]
+            ? [
+                  event.type,
+                  event.text,
+                  ...(event.domain === 'real' ? [event.actorId] : []),
+              ]
             : [
                   event.type,
                   event.giftId,
@@ -121,6 +133,7 @@ export function fingerprint(event: ScoringEvent): string {
                       ? event.delivery.sequenceId
                       : null,
                   event.delivery.kind === 'combo' ? event.delivery.final : null,
+                  ...(event.domain === 'real' ? [event.actorId] : []),
               ],
     );
 }

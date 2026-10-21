@@ -39,7 +39,10 @@ export function createFrontendConfig(
     if (!['127.0.0.1', '::1'].includes(backendHost))
         throw new Error('BACKEND_HOST deve ser loopback.');
     const target = `http://${backendHost === '::1' ? '[::1]' : backendHost}:${backendPort}`;
-    const proxy = { '/realtime': { target, ws: true, rewriteWsOrigin: false } };
+    const proxy = {
+        '/realtime': { target, ws: true, rewriteWsOrigin: false },
+        '/arena': { target, ws: true, rewriteWsOrigin: false },
+    };
     return {
         root,
         envDir,
