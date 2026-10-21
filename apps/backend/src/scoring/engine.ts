@@ -6,7 +6,9 @@ import type {
     EngineCheckpoint,
     GiftEvent,
     Snapshot,
+    RulesVersion,
 } from './contracts.ts';
+import { CURRENT_RULES_VERSION } from './contracts.ts';
 import { createGiftCatalog, DEFAULT_GIFT_CATALOG } from './catalog.ts';
 import { interpretComment } from './comments.ts';
 import {
@@ -17,6 +19,7 @@ import {
 } from './validation.ts';
 
 type Sequence = {
+    actorId?: string;
     giftId: string;
     quantity: number;
     final: boolean;
@@ -28,9 +31,13 @@ export type EngineOptions = Readonly<{
     domain: Domain;
     catalog?: unknown;
     capacity?: number;
+    rulesVersion?: RulesVersion;
+    /** Server-only opt-in. It is not parsed from an event. */
+    enableRealScoring?: true;
+    sourcePolicy?: string;
 }>;
 
-/** In-memory, server-internal simulation/observation engine. No real scoring ingress. */
+/** Single domain engine. Real ingress additionally requires explicit server opt-in. */
 export function createScoringEngine(
     options: EngineOptions,
     sessionId: string = randomUUID(),
@@ -39,12 +46,18 @@ export function createScoringEngine(
     const roomId = normalizeId(options.roomId);
     const domain = options.domain;
     const capacity = options.capacity ?? 10_000;
+    const rulesVersion = options.rulesVersion ?? CURRENT_RULES_VERSION;
     if (
         typeof sessionId !== 'string' ||
         !normalizeId(sessionId) ||
         !origin ||
         !roomId ||
-        !['simulation', 'observation'].includes(domain) ||
+        (rulesVersion !== 'scoring-v1' && rulesVersion !== 'scoring-v2') ||
+        (!['simulation', 'observation'].includes(domain) &&
+            !(domain === 'real' && options.enableRealScoring === true)) ||
+        (options.sourcePolicy !== undefined &&
+            (typeof options.sourcePolicy !== 'string' ||
+                options.sourcePolicy.length > 8192)) ||
         !Number.isSafeInteger(capacity) ||
         capacity < 1 ||
         capacity > 10_000
@@ -134,7 +147,7 @@ export function createScoringEngine(
         let points: number;
         let nextSequence: Sequence | undefined;
         if (event.type === 'comment') {
-            candidate = interpretComment(event.text);
+            candidate = interpretComment(event.text, rulesVersion);
             points = 1;
             if (!candidate) {
                 remember();
@@ -143,7 +156,11 @@ export function createScoringEngine(
         } else {
             const activeSequence =
                 key === null ? undefined : sequences.get(key);
-            if (activeSequence && activeSequence.giftId !== event.giftId) {
+            if (
+                activeSequence &&
+                (activeSequence.giftId !== event.giftId ||
+                    activeSequence.actorId !== event.actorId)
+            ) {
                 if (!activeSequence.final) activeSequence.invalid = true;
                 remember();
                 return result('rejected', 'COMBO_CONFLICT', identity);
@@ -182,6 +199,7 @@ export function createScoringEngine(
                     }
                 }
                 nextSequence = {
+                    ...(event.actorId ? { actorId: event.actorId } : {}),
                     giftId: event.giftId,
                     quantity: event.delivery.quantity,
                     final: event.delivery.final,
@@ -213,6 +231,10 @@ export function createScoringEngine(
         roomId,
         domain,
         capacity,
+        rulesVersion,
+        ...(options.sourcePolicy !== undefined
+            ? { sourcePolicy: options.sourcePolicy }
+            : {}),
         catalog: Object.freeze(
             [...catalog.values()].sort((a, b) =>
                 a.giftId < b.giftId ? -1 : a.giftId > b.giftId ? 1 : 0,

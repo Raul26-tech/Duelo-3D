@@ -16,7 +16,8 @@ const scheduleDefault: Scheduler = (task, delay) => {
     return () => clearTimeout(timer);
 };
 
-/** Lifecycle only. It has no scoring, persistence or simulation capability. */
+/** Provider lifecycle with optional composition hook. It imports no scoring or SQL.
+ * Diagnostic callers omit the hook and have no capability to change a score. */
 export function createDiagnosticClient(options: {
     enabled: boolean;
     factory: () => ProviderClient;
@@ -24,6 +25,14 @@ export function createDiagnosticClient(options: {
     observer: ReturnType<typeof createEventObserver>;
     schedule?: Scheduler;
     now?: () => number;
+    ingress?: {
+        connected(roomId: string): void;
+        receive(
+            kind: 'comment' | 'gift',
+            payload: unknown,
+            roomId: string,
+        ): void;
+    };
 }) {
     const schedule = options.schedule ?? scheduleDefault;
     const now = options.now ?? Date.now;
@@ -150,14 +159,20 @@ export function createDiagnosticClient(options: {
                 }
                 received += 1;
                 if (received > 100) {
-                    if (received === 101) report('event_rate_limited');
+                    if (received === 101) {
+                        report('event_rate_limited');
+                        // Diagnostics may sample; a real authority must not continue after known loss.
+                        if (options.ingress) void stop('event_rate_limited');
+                    }
                     return;
                 }
                 try {
+                    if (roomId) options.ingress?.receive(kind, value, roomId);
                     options.observer.observe(
                         normalizeProviderEvent(kind, value, roomId),
                     );
                 } catch {
+                    if (options.ingress) void stop('provider_failure');
                     report('provider_error');
                 }
             });
@@ -201,6 +216,12 @@ export function createDiagnosticClient(options: {
                     if (roomId && roomId !== connectedRoom) {
                         options.observer.interrupt();
                         report('room_changed');
+                    }
+                    try {
+                        options.ingress?.connected(connectedRoom);
+                    } catch {
+                        void stop('provider_failure');
+                        return;
                     }
                     roomId = connectedRoom;
                     state = 'connected';

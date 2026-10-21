@@ -23,6 +23,7 @@ type Metadata = {
     session_id: string;
     origin: string;
     room_id: string;
+    source_policy?: string | null;
     domain: EngineCheckpoint['state']['domain'];
     capacity: number;
     catalog_json: string;
@@ -33,10 +34,24 @@ type Metadata = {
     journal_count: number;
     digest: string;
 };
-const digest = (data: StoredScoring) =>
-    createHash('sha256')
-        .update(JSON.stringify({ rules: RULES_VERSION, ...data }))
+const digest = (data: StoredScoring) => {
+    const { rulesVersion, ...legacyConfiguration } =
+        data.checkpoint.configuration;
+    // Preserve the exact v1 digest format; never rewrite historical decisions as v2.
+    const checkpoint =
+        rulesVersion === 'scoring-v1'
+            ? { ...data.checkpoint, configuration: legacyConfiguration }
+            : data.checkpoint;
+    return createHash('sha256')
+        .update(
+            JSON.stringify({
+                rules: rulesVersion,
+                checkpoint,
+                journal: data.journal,
+            }),
+        )
         .digest('hex');
+};
 const compareIdentity = (a: { identity: string }, b: { identity: string }) =>
     a.identity < b.identity ? -1 : a.identity > b.identity ? 1 : 0;
 
@@ -94,8 +109,9 @@ class SqliteScoringStore implements ScoringStore {
         if (
             this.db.pragma('application_id', { simple: true }) !==
                 APPLICATION_ID ||
-            this.db.pragma('user_version', { simple: true }) !==
-                SCHEMA_VERSION ||
+            ![1, SCHEMA_VERSION].includes(
+                Number(this.db.pragma('user_version', { simple: true })),
+            ) ||
             this.db.pragma('journal_mode', { simple: true }) !== 'wal' ||
             this.db.pragma('foreign_keys', { simple: true }) !== 1 ||
             this.db.pragma('integrity_check', { simple: true }) !== 'ok' ||
@@ -111,8 +127,9 @@ class SqliteScoringStore implements ScoringStore {
             if (
                 this.db.pragma('application_id', { simple: true }) !==
                     APPLICATION_ID ||
-                this.db.pragma('user_version', { simple: true }) !==
-                    SCHEMA_VERSION ||
+                ![1, SCHEMA_VERSION].includes(
+                    Number(this.db.pragma('user_version', { simple: true })),
+                ) ||
                 (this.db.pragma('foreign_key_check') as unknown[]).length
             )
                 throw new Error('foreign keys');
@@ -121,7 +138,8 @@ class SqliteScoringStore implements ScoringStore {
                 .all() as Metadata[];
             if (rows.length !== 1) throw new Error('missing dispute');
             const meta = rows[0];
-            if (meta.rules_version !== RULES_VERSION)
+            const rulesVersion = meta.rules_version;
+            if (rulesVersion !== 'scoring-v1' && rulesVersion !== RULES_VERSION)
                 throw new Error('unsupported rules version');
             const journalRows = this.db
                 .prepare(
@@ -147,6 +165,7 @@ class SqliteScoringStore implements ScoringStore {
                 session_id: string;
                 identity: string;
                 gift_id: string;
+                actor_id?: string | null;
                 quantity: number;
                 final: number;
                 invalid: number;
@@ -176,6 +195,10 @@ class SqliteScoringStore implements ScoringStore {
                     roomId: meta.room_id,
                     domain: meta.domain,
                     capacity: meta.capacity,
+                    rulesVersion,
+                    ...(meta.source_policy != null
+                        ? { sourcePolicy: meta.source_policy }
+                        : {}),
                     catalog: JSON.parse(meta.catalog_json),
                 },
                 state: {
@@ -193,6 +216,9 @@ class SqliteScoringStore implements ScoringStore {
                 sequences: sequenceRows
                     .map((row) => ({
                         identity: row.identity,
+                        ...(row.actor_id != null
+                            ? { actorId: row.actor_id }
+                            : {}),
                         giftId: row.gift_id,
                         quantity: row.quantity,
                         final: row.final === 1,
@@ -229,13 +255,20 @@ class SqliteScoringStore implements ScoringStore {
                     config.domain,
                     config.capacity,
                     JSON.stringify(config.catalog),
-                    RULES_VERSION,
+                    config.rulesVersion,
                     state.version,
                     state.scores.lula,
                     state.scores.flavio,
                     journal.length,
                     digest({ checkpoint, journal }),
                 );
+            if (
+                this.db.pragma('user_version', { simple: true }) ===
+                SCHEMA_VERSION
+            )
+                this.db
+                    .prepare('UPDATE dispute SET source_policy = ?')
+                    .run(config.sourcePolicy ?? null);
         }
         this.db.prepare('DELETE FROM event_identities').run();
         const insertEvent = this.db.prepare(
@@ -244,8 +277,12 @@ class SqliteScoringStore implements ScoringStore {
         for (const event of checkpoint.events)
             insertEvent.run(state.sessionId, event.identity, event.fingerprint);
         this.db.prepare('DELETE FROM gift_sequences').run();
+        const modern =
+            this.db.pragma('user_version', { simple: true }) === SCHEMA_VERSION;
         const insertSequence = this.db.prepare(
-            'INSERT INTO gift_sequences VALUES (?, ?, ?, ?, ?, ?)',
+            modern
+                ? 'INSERT INTO gift_sequences (session_id, identity, gift_id, quantity, final, invalid, actor_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
+                : 'INSERT INTO gift_sequences VALUES (?, ?, ?, ?, ?, ?)',
         );
         for (const sequence of checkpoint.sequences)
             insertSequence.run(
@@ -255,6 +292,7 @@ class SqliteScoringStore implements ScoringStore {
                 sequence.quantity,
                 Number(sequence.final),
                 Number(sequence.invalid),
+                ...(modern ? [sequence.actorId ?? null] : []),
             );
         if (!initialize)
             this.db
@@ -338,7 +376,15 @@ export function openSqliteScoring(options: {
     try {
         return createScoringCoordinator(
             store,
-            { ...configuration, catalog: configuration.catalog },
+            {
+                ...configuration,
+                // Omitted means adopt the persisted version on resume, not force current rules.
+                rulesVersion: options.engine.rulesVersion,
+                catalog: configuration.catalog,
+                ...(options.engine.enableRealScoring
+                    ? { enableRealScoring: true as const }
+                    : {}),
+            },
             options.mode,
         );
     } catch (error) {

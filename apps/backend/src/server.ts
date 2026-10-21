@@ -1,8 +1,16 @@
 import { createServer } from 'node:http';
 
-export function createBackendServer() {
+export function createBackendServer(
+    mode: 'simulation' | 'observation' | 'real' = 'simulation',
+) {
     return createServer((request, response) => {
         response.setHeader('Content-Type', 'application/json; charset=utf-8');
+        if (request.method === 'GET' && request.url === '/arena/mode') {
+            response.setHeader('Cache-Control', 'no-store');
+            response.writeHead(200);
+            response.end(JSON.stringify({ mode }));
+            return;
+        }
         if (request.method === 'GET' && request.url === '/health') {
             response.writeHead(200);
             response.end(

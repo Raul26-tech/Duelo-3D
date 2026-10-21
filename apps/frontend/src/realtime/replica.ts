@@ -4,7 +4,7 @@ import {
     type StateMessage,
 } from './protocol.ts';
 
-export function createReplica() {
+export function createReplica(mode: 'simulation' | 'real' = 'simulation') {
     let state: RemoteState | null = null;
     let needsSnapshot = true;
     return {
@@ -15,7 +15,7 @@ export function createReplica() {
             return state ? { ...state, scores: { ...state.scores } } : null;
         },
         accept(value: unknown): StateMessage | null {
-            const message = parseStateMessage(value);
+            const message = parseStateMessage(value, mode);
             if (!message) return null;
             const next = message.state;
             if (needsSnapshot && message.type !== 'state.snapshot') return null;

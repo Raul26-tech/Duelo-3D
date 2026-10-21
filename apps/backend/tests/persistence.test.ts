@@ -414,7 +414,7 @@ test('replay detecta contradição lógica mesmo se o digest das projeções foi
     const digest = createHash('sha256')
         .update(
             JSON.stringify({
-                rules: 'scoring-v1',
+                rules: checkpoint.configuration.rulesVersion,
                 checkpoint: forged,
                 journal,
             }),

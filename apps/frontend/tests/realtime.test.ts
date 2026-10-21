@@ -189,3 +189,79 @@ test('negação de autorização interrompe reconexão até nova chave', () => {
     assert.equal(s.client.vote('a'), false);
     s.client.close();
 });
+
+test('réplica real rejeita simulação, mensagens obsoletas e sessão antiga; reconcilia snapshot persistido', () => {
+    const replica = createReplica('real');
+    const real = (
+        value: ReturnType<typeof message> | ReturnType<typeof updated>,
+    ) => ({ ...value, state: { ...value.state, mode: 'real' } });
+    assert.equal(replica.accept(message()), null);
+    assert.equal(replica.accept(real(updated())), null);
+    assert.ok(replica.accept(real(message(5))));
+    assert.equal(replica.accept(real(updated(4))), null);
+    assert.equal(
+        replica.accept(real(updated(6, 'old_session_0123456789'))),
+        null,
+    );
+    replica.beginConnection();
+    assert.equal(replica.accept(real(message(4))), null);
+    assert.ok(replica.accept(real(message(5))));
+    assert.ok(replica.accept(real(updated(6))));
+    assert.equal(replica.accept(updated(7)), null);
+    assert.equal(replica.getState()?.scores.a, 6);
+});
+
+test('cliente real não envia autorização/voto/reset; reconecta somente para leitura e ignora socket antigo', () => {
+    const sockets: FakeSocket[] = [];
+    const states: unknown[] = [];
+    const timers = new Map<number, { callback: () => void; delay: number }>();
+    let n = 0;
+    const client = createRealtimeClient({
+        url: 'ws://127.0.0.1/arena',
+        mode: 'real',
+        onState: (message) => states.push(message),
+        onStatus() {},
+        socketFactory() {
+            const socket = new FakeSocket();
+            sockets.push(socket);
+            return socket as unknown as WebSocket;
+        },
+        schedule: ((callback: () => void, delay: number) => {
+            const id = ++n;
+            timers.set(id, { callback, delay });
+            return id;
+        }) as unknown as typeof setTimeout,
+        cancel: ((id: number) => {
+            timers.delete(id);
+        }) as unknown as typeof clearTimeout,
+    });
+    assert.equal(client.authorize(token), false);
+    assert.equal(client.startReadonly(), true);
+    const first = sockets[0];
+    first.open();
+    first.receive({
+        ...message(2),
+        state: { ...message(2).state, mode: 'real' },
+    });
+    assert.equal(client.vote('a'), false);
+    assert.equal(client.reset(), false);
+    assert.equal(first.sent.length, 0);
+    assert.equal(states.length, 1);
+    first.close();
+    const retry = [...timers.values()].find((timer) => timer.delay === 500);
+    assert.ok(retry);
+    retry.callback();
+    sockets[1].open();
+    sockets[1].receive({
+        ...message(3),
+        state: { ...message(3).state, mode: 'real' },
+    });
+    first.receive({
+        ...updated(99),
+        state: { ...updated(99).state, mode: 'real' },
+    });
+    assert.equal(states.length, 2);
+    assert.equal(sockets[1].sent.length, 0);
+    client.close();
+    assert.equal(timers.size, 0);
+});

@@ -1,8 +1,10 @@
-# Duelo 3D — simulação local e motor de regras
+# Duelo 3D Live — simulação, observação e disputa persistida
 
 Enquete informal de entretenimento, sem vínculo com votação eleitoral oficial ou pesquisa representativa.
 
-O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP e WebSocket). O backend é a única autoridade da simulação: os botões enviam comandos e a arena atualiza somente quando recebe estado do servidor. Não há ingestão TikTok ou disputa real. A Fase 4 oferece persistência SQLite optativa para o motor interno, sem conectar esse armazenamento à arena. A Fase 3 acrescenta um motor interno e testável de comentários/presentes, independente do transporte e ainda sem entrada externa ou ligação com a arena.
+O monorepo usa npm workspaces: apps/frontend (Vite/TypeScript/arena) e apps/backend (Node/TypeScript ESM/HTTP, WebSocket e SQLite). O backend é a única autoridade do placar. Há três modos exclusivos: `simulation` (padrão, sem TikTok), `observation` (diagnóstico sem pontos) e `real` (TikTok → motor existente → commit SQLite → arena somente leitura). O modo real exige ativação explícita, revisão de identidade, transmissão e disputa persistida; presentes começam desligados com catálogo vazio.
+
+Configuração, contratos, recuperação, limitações e procedimento controlado: [docs/tiktok-scoring-integration.md](docs/tiktok-scoring-integration.md). Resultados executados: [docs/validacao-tiktok-scoring.md](docs/validacao-tiktok-scoring.md).
 
 ## Executar juntos
 
@@ -43,7 +45,7 @@ npm run format:check
 npm run dev:frontend
 npm run dev:backend
 
-# Após build: HTTP técnico, sem habilitar simulação por padrão
+# Após build: HTTP técnico; o modo real ainda exige configuração explícita
 npm start --workspace backend
 curl --fail http://127.0.0.1:3000/health
 ```
@@ -64,9 +66,9 @@ Arquitetura, contratos, limites, exemplos e segurança: [docs/realtime-simulatio
 
 ## Motor de regras — Fase 3
 
-`apps/backend/src/scoring` interpreta comentários com um único candidato, valida presentes pelo catálogo do servidor e controla identidades e combos acumulados. O catálogo padrão é vazio; dados sintéticos existem somente nos testes. O motor aceita simulação e observação, rejeita modo real e não adiciona endpoints ou dependências.
+`apps/backend/src/scoring` interpreta comentários com um único candidato, valida presentes pelo catálogo do servidor e controla identidades e combos acumulados. O catálogo padrão é vazio; dados sintéticos existem somente nos testes. Para novas disputas (`scoring-v2`), comentários reconhecem `Lula`/`13` ou `Flávio`/`Flavio`/`22`, sempre no máximo um ponto; menções aos dois participantes não pontuam. Disputas persistidas com `scoring-v1` conservam as regras anteriores, inclusive na continuação, sem recálculo retroativo. Presentes, combos e capacidade mantêm suas regras. A compatibilidade do replay e os testes dos aliases estão documentados em [docs/validacao-comment-aliases.md](docs/validacao-comment-aliases.md). O domínio real exige opt-in interno do servidor; payloads não podem habilitá-lo.
 
-A simulação WebSocket existente permanece preservada. O novo motor não recebe comandos do navegador e ainda não alimenta a arena. A integração futura deverá autenticar a fonte antes de construir os eventos normalizados.
+A simulação WebSocket existente permanece preservada. No modo real, somente callbacks da conexão TikTok autorizada entram no motor; o navegador recebe snapshots/atualizações e não pode votar ou reinicializar a disputa.
 
 Contratos, limites, política de finalização de combos e exemplos: [docs/scoring-engine.md](docs/scoring-engine.md).
 
@@ -78,7 +80,7 @@ Veja [docs/validacao-scoring-engine.md](docs/validacao-scoring-engine.md) para o
 
 `apps/backend/src/persistence` acrescenta armazenamento SQLite local ao motor de regras. Cada processamento usa transação, recuperação pelo mesmo motor e verificação integral antes de devolver o estado comitado. Identidades, fingerprints, combos, sessão, placar e versão são persistidos juntos. Dados ausentes/inconsistentes bloqueiam a retomada.
 
-Biblioteca: better-sqlite3 12.10.1, validada com Node 24.15.0. O banco padrão fica em `~/.local/state/duelo-3d/scoring.sqlite`, fora do repositório; criação e retomada são operações explícitas da API interna. `npm run dev` continua iniciando a simulação existente sem criar banco.
+Biblioteca: better-sqlite3 12.10.1, validada com Node 24.15.0. O banco padrão fica em `~/.local/state/duelo-3d/scoring.sqlite`, fora do repositório; criação e retomada são operações explícitas da API interna. `npm run dev` no modo padrão continua iniciando a simulação existente sem criar banco. Somente o modo real explicitamente configurado abre a disputa SQLite selecionada.
 
 Arquitetura, esquema, exemplo e recuperação: [docs/scoring-persistence.md](docs/scoring-persistence.md). Resultados e limitações: [docs/validacao-scoring-persistence.md](docs/validacao-scoring-persistence.md).
 
@@ -91,6 +93,14 @@ Adaptador independente, com `tiktok-live-connector@2.5.0`, somente para observa�
 TIKTOK_DIAGNOSTIC_ENABLED=false npm run diagnose:tiktok
 ```
 
-Para diagnóstico real posterior, configurar opt-in e handle no `.env` central e executar o mesmo comando em terminal dedicado. A execução é limitada a cinco minutos e possui logs pseudonimizados e encerramento por Ctrl+C. `npm run dev` continua independente do conector.
+Para diagnóstico real posterior, configurar opt-in e handle no `.env` central e executar o mesmo comando em terminal dedicado. A execução é limitada a cinco minutos e possui logs pseudonimizados e encerramento por Ctrl+C. `npm run dev` no modo padrão continua independente do conector. O modo `observation` explícito também permite diagnóstico junto aos serviços, sem placar; o comando dedicado continua limitado a cinco minutos.
 
 Contratos, campos inspecionados, incertezas de combos, serviço de assinatura e roteiro de LIVE: [docs/tiktok-live-diagnostic.md](docs/tiktok-live-diagnostic.md). Resultados: [docs/validacao-tiktok-diagnostic.md](docs/validacao-tiktok-diagnostic.md). Nenhuma LIVE foi validada nesta entrega.
+
+## Modos da Fase 5.2
+
+`DUEL_MODE=simulation npm run dev` preserva a simulação. Para diagnóstico junto aos serviços, use `DUEL_MODE=observation`, `TIKTOK_DIAGNOSTIC_ENABLED=true` e a conta configurada na raiz. Não há pontuação nesse modo.
+
+Para uma disputa real autorizada, configure as variáveis documentadas no `.env.example`, incluindo `DUEL_MODE=real`, `TIKTOK_REAL_ENABLED=true`, identidade revisada, conta, sala, banco e ação `create` ou `resume`. Depois execute `npm run dev`. O `.env` nunca vai para o navegador. Não habilite real apenas para experimentar a instalação; primeiro siga o roteiro de revisão e teste controlado. Não foram enviados comentários ou presentes, nem iniciada uma LIVE durante a implementação.
+
+O catálogo é um JSON externo opcional; `config/gift-catalog.example.json` começa com `[]`. Cada entrada exige ID efetivo, participante, inteiro positivo seguro e entrega revisada. Não há associações predefinidas. Bancos e logs devem ficar fora do projeto. Reinícios exigem `resume`, mesmo contexto e mesma política; recuperação insegura bloqueia o processamento. Não existe reset ou administração de disputa real pela arena.

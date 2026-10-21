@@ -1,6 +1,6 @@
 import type { Side } from '../config/participants.ts';
 export type RemoteState = {
-    mode: 'simulation';
+    mode: 'simulation' | 'real';
     sessionId: string;
     version: number;
     scores: { a: number; b: number };
@@ -15,7 +15,10 @@ export type StateMessage = {
 function object(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-export function parseStateMessage(value: unknown): StateMessage | null {
+export function parseStateMessage(
+    value: unknown,
+    expectedMode: 'simulation' | 'real' = 'simulation',
+): StateMessage | null {
     if (
         !object(value) ||
         value.protocol !== 1 ||
@@ -25,7 +28,7 @@ export function parseStateMessage(value: unknown): StateMessage | null {
         return null;
     const state = value.state;
     if (
-        state.mode !== 'simulation' ||
+        state.mode !== expectedMode ||
         typeof state.sessionId !== 'string' ||
         !/^[A-Za-z0-9_-]{16,64}$/.test(state.sessionId) ||
         !Number.isSafeInteger(state.version) ||

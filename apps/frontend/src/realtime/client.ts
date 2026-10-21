@@ -9,6 +9,7 @@ export function reconnectDelay(attempt: number) {
 }
 export function createRealtimeClient(options: {
     url: string;
+    mode?: 'simulation' | 'real';
     onState(message: StateMessage): void;
     onStatus(status: ConnectionStatus): void;
     onRejected?(code: string): void;
@@ -17,7 +18,8 @@ export function createRealtimeClient(options: {
     cancel?: typeof clearTimeout;
     idFactory?: () => string;
 }) {
-    const replica = createReplica();
+    const mode = options.mode ?? 'simulation';
+    const replica = createReplica(mode);
     const schedule = options.schedule ?? setTimeout;
     const cancel = options.cancel ?? clearTimeout;
     const id = options.idFactory ?? (() => crypto.randomUUID());
@@ -51,6 +53,7 @@ export function createRealtimeClient(options: {
         deadline = schedule(() => connection.close(), 7000);
         connection.onopen = () => {
             if (current !== generation) return;
+            if (mode === 'real') return;
             connection.send(
                 JSON.stringify({
                     type: 'simulation.authorize',
@@ -109,6 +112,7 @@ export function createRealtimeClient(options: {
         retry = schedule(connect, reconnectDelay(attempt++));
     }
     function send(type: 'simulation.vote' | 'simulation.reset', side?: Side) {
+        if (mode !== 'simulation') return false;
         const state = replica.getState();
         if (!ready || !state || socket?.readyState !== 1) return false;
         const command = {
@@ -128,7 +132,14 @@ export function createRealtimeClient(options: {
         }
     }
     return {
+        startReadonly() {
+            if (mode !== 'real' || !stopped) return false;
+            stopped = false;
+            connect();
+            return true;
+        },
         authorize(value: string) {
+            if (mode !== 'simulation') return false;
             if (!/^[A-Za-z0-9_-]{32,128}$/.test(value)) return false;
             ++generation;
             cancel(retry);

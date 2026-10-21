@@ -1,0 +1,167 @@
+[
+    {
+        "options": {
+            "origin": "legacy-fixture",
+            "roomId": "7312345678901234567",
+            "domain": "simulation"
+        },
+        "checkpoint": {
+            "configuration": {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "domain": "simulation",
+                "capacity": 10000,
+                "catalog": []
+            },
+            "state": {
+                "sessionId": "legacy_session_0123456789",
+                "domain": "simulation",
+                "version": 2,
+                "scores": {
+                    "lula": 1,
+                    "flavio": 1
+                }
+            },
+            "events": [
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"simulation\",\"comment\",\"1\"]",
+                    "fingerprint": "[\"comment\",\"13\"]"
+                },
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"simulation\",\"comment\",\"2\"]",
+                    "fingerprint": "[\"comment\",\"Lula 22\"]"
+                },
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"simulation\",\"comment\",\"3\"]",
+                    "fingerprint": "[\"comment\",\"22\"]"
+                },
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"simulation\",\"comment\",\"4\"]",
+                    "fingerprint": "[\"comment\",\"Flávio 13\"]"
+                }
+            ],
+            "sequences": []
+        },
+        "journal": [
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "1",
+                "domain": "simulation",
+                "type": "comment",
+                "text": "13"
+            },
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "2",
+                "domain": "simulation",
+                "type": "comment",
+                "text": "Lula 22"
+            },
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "3",
+                "domain": "simulation",
+                "type": "comment",
+                "text": "22"
+            },
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "4",
+                "domain": "simulation",
+                "type": "comment",
+                "text": "Flávio 13"
+            }
+        ],
+        "digest": "fbaf25b9849e9e5dbb5847778b0b42919ce6b284cf2356768485337efccf1ebb"
+    },
+    {
+        "options": {
+            "origin": "legacy-fixture",
+            "roomId": "7312345678901234567",
+            "domain": "real",
+            "enableRealScoring": true,
+            "sourcePolicy": "legacy-reviewed-fixture"
+        },
+        "checkpoint": {
+            "configuration": {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "domain": "real",
+                "capacity": 10000,
+                "sourcePolicy": "legacy-reviewed-fixture",
+                "catalog": []
+            },
+            "state": {
+                "sessionId": "legacy_session_0123456789",
+                "domain": "real",
+                "version": 2,
+                "scores": {
+                    "lula": 1,
+                    "flavio": 1
+                }
+            },
+            "events": [
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"real\",\"comment\",\"1\"]",
+                    "fingerprint": "[\"comment\",\"13\",\"7212345678901234567\"]"
+                },
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"real\",\"comment\",\"2\"]",
+                    "fingerprint": "[\"comment\",\"Lula 22\",\"7212345678901234567\"]"
+                },
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"real\",\"comment\",\"3\"]",
+                    "fingerprint": "[\"comment\",\"22\",\"7212345678901234567\"]"
+                },
+                {
+                    "identity": "[\"legacy-fixture\",\"7312345678901234567\",\"real\",\"comment\",\"4\"]",
+                    "fingerprint": "[\"comment\",\"Flávio 13\",\"7212345678901234567\"]"
+                }
+            ],
+            "sequences": []
+        },
+        "journal": [
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "1",
+                "actorId": "7212345678901234567",
+                "domain": "real",
+                "type": "comment",
+                "text": "13"
+            },
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "2",
+                "actorId": "7212345678901234567",
+                "domain": "real",
+                "type": "comment",
+                "text": "Lula 22"
+            },
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "3",
+                "actorId": "7212345678901234567",
+                "domain": "real",
+                "type": "comment",
+                "text": "22"
+            },
+            {
+                "origin": "legacy-fixture",
+                "roomId": "7312345678901234567",
+                "eventId": "4",
+                "actorId": "7212345678901234567",
+                "domain": "real",
+                "type": "comment",
+                "text": "Flávio 13"
+            }
+        ],
+        "digest": "29d71decdc8dbf2ff65068ffa6c76d1149525e2f0f9c670a3632cbf7e4bbdd23"
+    }
+]

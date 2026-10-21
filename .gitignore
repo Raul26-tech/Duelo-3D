@@ -25,3 +25,5 @@ personagens-novos/
 *.db.*
 *.sqlite.*
 *.sqlite3.*
+
+*.authority.lock
