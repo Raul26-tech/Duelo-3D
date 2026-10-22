@@ -11,6 +11,10 @@ const trackedNotes = [
     'sequence_context_conflict',
     'sequence_interrupted',
     'tracking_capacity',
+    'sequence_unidentifiable',
+    'started_above_one',
+    'final_without_prior',
+    'after_final',
 ] as const;
 type Row = {
     giftId: string;
@@ -28,6 +32,20 @@ type Row = {
     repeatEndFinal: number;
     repeatEndMissing: number;
     notes: Partial<Record<(typeof trackedNotes)[number], number>>;
+    evidence: {
+        withOccurrenceId: number;
+        withoutUserId: number;
+        withoutMatchingRoom: number;
+        missingName: number;
+        namesDropped: number;
+        samplesDropped: number;
+        // Notification order per gift, NOT proof of a single sequence: groups may interleave.
+        samples: {
+            repeatCount: number | null;
+            repeatEnd: 0 | 1 | null;
+            hasGroupId: boolean;
+        }[];
+    };
 };
 /** Aggregates only public gift metadata and counters. No user/room/event/group IDs or chat text leave memory. */
 export function createGiftReport(giftLimit = 32) {
@@ -71,10 +89,39 @@ export function createGiftReport(giftLimit = 32) {
                     repeatEndFinal: 0,
                     repeatEndMissing: 0,
                     notes: {},
+                    evidence: {
+                        withOccurrenceId: 0,
+                        withoutUserId: 0,
+                        withoutMatchingRoom: 0,
+                        missingName: 0,
+                        namesDropped: 0,
+                        samplesDropped: 0,
+                        samples: [],
+                    },
                 };
                 rows.set(c.giftId, row);
             }
             row.notifications++;
+            if (c.eventId) row.evidence.withOccurrenceId++;
+            if (!c.userId) row.evidence.withoutUserId++;
+            if (!c.roomId || c.roomId !== event.connectionRoomId)
+                row.evidence.withoutMatchingRoom++;
+            if (!c.giftName) row.evidence.missingName++;
+            if (row.evidence.samples.length < 8)
+                row.evidence.samples.push({
+                    repeatCount: c.repeatCount,
+                    repeatEnd: c.repeatEnd,
+                    hasGroupId: c.sequenceId !== null,
+                });
+            else row.evidence.samplesDropped++;
+            if (
+                c.giftName &&
+                !row.names.includes(c.giftName) &&
+                (row.names.length >= 2 ||
+                    c.giftName.length > 128 ||
+                    /[\u0000-\u001f\u007f]/u.test(c.giftName))
+            )
+                row.evidence.namesDropped++;
             if (event.status === 'invalid') row.invalid++;
             if (event.status === 'insufficient') row.insufficient++;
             if (
@@ -115,6 +162,7 @@ export function createGiftReport(giftLimit = 32) {
         snapshot() {
             const result = {
                 schema: 1,
+                evidenceVersion: 1,
                 domain: 'observation',
                 scoringEligible: false,
                 semanticsConfirmed: false,
@@ -127,6 +175,7 @@ export function createGiftReport(giftLimit = 32) {
                     samples: 30000,
                     namesPerGift: 2,
                     nameLength: 128,
+                    samplesPerGift: 8,
                 },
                 gifts: [...rows.values()].map((row) => ({
                     ...row,
@@ -134,6 +183,12 @@ export function createGiftReport(giftLimit = 32) {
                     giftTypes: [...row.giftTypes],
                     comboFlags: [...row.comboFlags],
                     notes: { ...row.notes },
+                    evidence: {
+                        ...row.evidence,
+                        samples: row.evidence.samples.map((sample) => ({
+                            ...sample,
+                        })),
+                    },
                     requiresOperatorReview: true,
                 })),
             };

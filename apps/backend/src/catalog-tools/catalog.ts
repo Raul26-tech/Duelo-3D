@@ -6,7 +6,7 @@ import { providerId } from '../tiktok/normalize.ts';
 import {
     parseReviewedCatalog,
     type ReviewedGift,
-} from '../integration/config.ts';
+} from '../integration/gift-policy.ts';
 import { readLocalJson } from '../local-json.ts';
 
 export type ReferenceGift = GiftRule &
