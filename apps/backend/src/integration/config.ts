@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createGiftCatalog } from '../scoring/catalog.ts';
-import type { GiftRule } from '../scoring/contracts.ts';
-import { exact, record } from '../scoring/validation.ts';
+import { createGiftCatalog, giftRuleKey } from '../scoring/catalog.ts';
+import type { CatalogGiftRule } from '../scoring/contracts.ts';
+import { record } from '../scoring/validation.ts';
 import { providerId } from '../tiktok/normalize.ts';
 import { readDiagnosticConfig } from '../tiktok/config.ts';
 
 export type OperationMode = 'simulation' | 'observation' | 'real';
-export type ReviewedGift = GiftRule &
+export type ReviewedGift = CatalogGiftRule &
     Readonly<{ delivery: 'single' | 'cumulative-final' }>;
 export type RealConfig = Readonly<{
     mode: 'real';
@@ -26,42 +26,41 @@ const root = fileURLToPath(new URL('../../../../', import.meta.url));
 export function parseReviewedCatalog(value: unknown): readonly ReviewedGift[] {
     if (!Array.isArray(value) || value.length > 1000)
         throw new Error('Invalid reviewed gift catalog');
-    const rules = value.map((entry: unknown) => {
+    const stripped = value.map((entry: unknown) => {
         if (
             !record(entry) ||
-            !exact(entry, [
-                'giftId',
-                'name',
-                'candidate',
-                'points',
-                'delivery',
-            ]) ||
-            !providerId(entry.giftId) ||
-            typeof entry.giftId !== 'string' ||
             (entry.delivery !== 'single' &&
                 entry.delivery !== 'cumulative-final')
         )
-            throw new Error(
-                'Each gift needs a real decimal ID and reviewed delivery',
-            );
-        return {
-            giftId: entry.giftId,
-            name: entry.name,
-            candidate: entry.candidate,
-            points: entry.points,
-        };
+            throw new Error('Each gift needs reviewed delivery');
+        const { delivery: _delivery, ...rule } = entry;
+        if (
+            rule.match !== 'exact-name' &&
+            (typeof rule.giftId !== 'string' || !providerId(rule.giftId))
+        )
+            throw new Error('Each ID gift needs a real decimal ID');
+        return rule;
     });
-    const catalog = createGiftCatalog(rules);
+    if (new Set(stripped.map((rule) => rule.name)).size !== stripped.length)
+        throw new Error('Ambiguous duplicate gift names');
+    const catalog = createGiftCatalog(stripped);
     return Object.freeze(
         value
-            .map((entry) =>
-                Object.freeze({
-                    ...catalog.get(entry.giftId)!,
-                    delivery: entry.delivery,
-                }),
+            .map(
+                (entry, index) =>
+                    Object.freeze({
+                        ...catalog.get(
+                            giftRuleKey(stripped[index] as CatalogGiftRule),
+                        )!,
+                        delivery: entry.delivery,
+                    }) as ReviewedGift,
             )
             .sort((a, b) =>
-                a.giftId < b.giftId ? -1 : a.giftId > b.giftId ? 1 : 0,
+                giftRuleKey(a) < giftRuleKey(b)
+                    ? -1
+                    : giftRuleKey(a) > giftRuleKey(b)
+                      ? 1
+                      : 0,
             ),
     );
 }
@@ -117,7 +116,9 @@ export function readRealConfig(
         .update(
             JSON.stringify({
                 provider: 'tiktok-live-connector@2.5.0',
-                profile: 'v3-reviewed-identity-v1',
+                profile: gifts.some((gift) => gift.match !== undefined)
+                    ? 'hybrid-v1-literal'
+                    : 'v3-reviewed-identity-v1',
                 username: provider.username,
                 roomId,
                 gifts,

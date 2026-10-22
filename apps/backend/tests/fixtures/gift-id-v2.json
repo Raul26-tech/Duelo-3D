@@ -1,0 +1,108 @@
+{
+    "generatedFrom": "main 1782422 / unmodified scoring engine inherited from PR #8",
+    "options": {
+        "origin": "tiktok-live-connector@2.5.0",
+        "roomId": "7312345678901234567",
+        "domain": "real",
+        "enableRealScoring": true,
+        "sourcePolicy": "synthetic-legacy-gifts",
+        "catalog": [
+            {
+                "giftId": "5655",
+                "name": "Rose",
+                "candidate": "lula",
+                "points": 2
+            },
+            {
+                "giftId": "6560",
+                "name": "Tiny Diny",
+                "candidate": "flavio",
+                "points": 20
+            }
+        ]
+    },
+    "checkpoint": {
+        "configuration": {
+            "origin": "tiktok-live-connector@2.5.0",
+            "roomId": "7312345678901234567",
+            "domain": "real",
+            "capacity": 10000,
+            "rulesVersion": "scoring-v2",
+            "sourcePolicy": "synthetic-legacy-gifts",
+            "catalog": [
+                {
+                    "giftId": "5655",
+                    "name": "Rose",
+                    "candidate": "lula",
+                    "points": 2
+                },
+                {
+                    "giftId": "6560",
+                    "name": "Tiny Diny",
+                    "candidate": "flavio",
+                    "points": 20
+                }
+            ]
+        },
+        "state": {
+            "sessionId": "synthetic-main-1782422-session",
+            "domain": "real",
+            "version": 1,
+            "scores": {
+                "lula": 0,
+                "flavio": 20
+            }
+        },
+        "events": [
+            {
+                "identity": "[\"tiktok-live-connector@2.5.0\",\"7312345678901234567\",\"real\",\"gift\",\"1001\"]",
+                "fingerprint": "[\"gift\",\"5655\",\"combo\",2,\"5001\",false,\"7212345678901234567\"]"
+            },
+            {
+                "identity": "[\"tiktok-live-connector@2.5.0\",\"7312345678901234567\",\"real\",\"gift\",\"1002\"]",
+                "fingerprint": "[\"gift\",\"6560\",\"single\",1,null,null,\"7212345678901234567\"]"
+            }
+        ],
+        "sequences": [
+            {
+                "identity": "[\"tiktok-live-connector@2.5.0\",\"7312345678901234567\",\"real\",\"5001\"]",
+                "actorId": "7212345678901234567",
+                "giftId": "5655",
+                "quantity": 2,
+                "final": false,
+                "invalid": false
+            }
+        ]
+    },
+    "journal": [
+        {
+            "origin": "tiktok-live-connector@2.5.0",
+            "roomId": "7312345678901234567",
+            "eventId": "1001",
+            "actorId": "7212345678901234567",
+            "domain": "real",
+            "type": "gift",
+            "giftId": "5655",
+            "delivery": {
+                "kind": "combo",
+                "sequenceId": "5001",
+                "quantity": 2,
+                "final": false
+            }
+        },
+        {
+            "origin": "tiktok-live-connector@2.5.0",
+            "roomId": "7312345678901234567",
+            "eventId": "1002",
+            "actorId": "7212345678901234567",
+            "domain": "real",
+            "type": "gift",
+            "giftId": "6560",
+            "delivery": {
+                "kind": "single",
+                "quantity": 1
+            }
+        }
+    ],
+    "digest": "c7494f75f722e52994feac3cdd5612d2e111bee4e40edcf0b3ee08656ec2f9e8"
+}

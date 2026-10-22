@@ -30,7 +30,7 @@ const origin = 'http://127.0.0.1:5173';
 const gifts = parseReviewedCatalog([
     {
         giftId: '501',
-        name: 'Synthetic combo',
+        name: 'Synthetic gift',
         candidate: 'flavio',
         points: 7,
         delivery: 'cumulative-final',
@@ -476,7 +476,7 @@ test('real: overflow não grava identidade, sequência final ou placar parcial',
     const huge = parseReviewedCatalog([
         {
             giftId: '501',
-            name: 'Synthetic',
+            name: 'Synthetic gift',
             candidate: 'flavio',
             points: Number.MAX_SAFE_INTEGER,
             delivery: 'cumulative-final',

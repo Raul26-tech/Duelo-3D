@@ -25,6 +25,10 @@ export type GiftEvent = Identity &
     Readonly<{
         type: 'gift';
         giftId: string;
+        /** Hybrid v1 journal extension: actual provider ID above, authorized rule below. */
+        giftPolicy?: 'hybrid-v1';
+        giftName?: string | null;
+        giftRuleId?: string | null;
         delivery: GiftDelivery;
     }>;
 export type ScoringEvent = CommentEvent | GiftEvent;
@@ -34,6 +38,16 @@ export type GiftRule = Readonly<{
     candidate: Candidate;
     points: number;
 }>;
+export type CatalogGiftRule =
+    | (GiftRule & Readonly<{ match?: 'id' }>)
+    | Readonly<{
+          match: 'exact-name';
+          ruleId: string;
+          giftId?: never;
+          name: string;
+          candidate: Candidate;
+          points: number;
+      }>;
 export type Snapshot = Readonly<{
     sessionId: string;
     domain: Domain;
@@ -57,7 +71,7 @@ export type EngineConfiguration = Readonly<{
     capacity: number;
     rulesVersion: RulesVersion;
     sourcePolicy?: string;
-    catalog: readonly GiftRule[];
+    catalog: readonly CatalogGiftRule[];
 }>;
 export type EngineCheckpoint = Readonly<{
     configuration: EngineConfiguration;

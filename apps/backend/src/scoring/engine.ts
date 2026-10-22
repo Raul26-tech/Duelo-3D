@@ -9,7 +9,12 @@ import type {
     RulesVersion,
 } from './contracts.ts';
 import { CURRENT_RULES_VERSION } from './contracts.ts';
-import { createGiftCatalog, DEFAULT_GIFT_CATALOG } from './catalog.ts';
+import {
+    createGiftCatalog,
+    DEFAULT_GIFT_CATALOG,
+    giftRuleKey,
+    matchGift,
+} from './catalog.ts';
 import { interpretComment } from './comments.ts';
 import {
     eventIdentity,
@@ -66,6 +71,9 @@ export function createScoringEngine(
             'Invalid scoring engine configuration; real scoring is disabled',
         );
     const catalog = createGiftCatalog(options.catalog ?? DEFAULT_GIFT_CATALOG);
+    const hybridCatalog = [...catalog.values()].some(
+        (rule) => rule.match !== undefined,
+    );
     let version = 0;
     let scores = { lula: 0, flavio: 0 };
     const events = new Map<string, string>();
@@ -98,6 +106,9 @@ export function createScoringEngine(
             event.roomId,
             event.domain,
             event.delivery.kind === 'combo' ? event.delivery.sequenceId : null,
+            ...(event.giftPolicy && hybridCatalog
+                ? [event.actorId ?? null]
+                : []),
         ]);
 
     function process(value: unknown): Decision {
@@ -124,7 +135,15 @@ export function createScoringEngine(
             const old = JSON.parse(previous) as unknown[];
             if (old[0] === 'gift' && old[2] === 'combo') {
                 const sequence = sequences.get(
-                    JSON.stringify([origin, roomId, domain, old[4]]),
+                    JSON.stringify([
+                        origin,
+                        roomId,
+                        domain,
+                        old[4],
+                        ...(hybridCatalog && old[7] === 'hybrid-v1'
+                            ? [old[6] ?? null]
+                            : []),
+                    ]),
                 );
                 if (sequence && !sequence.final) sequence.invalid = true;
             }
@@ -154,19 +173,49 @@ export function createScoringEngine(
                 return result('ignored', 'NO_UNIQUE_CANDIDATE', identity);
             }
         } else {
+            const match = event.giftPolicy
+                ? matchGift(
+                      [...catalog.values()],
+                      event.giftId,
+                      event.giftName ?? null,
+                  )
+                : undefined;
+            const resolvedKey = match?.rule
+                ? giftRuleKey(match.rule)
+                : event.giftId;
+            const rule = event.giftPolicy
+                ? match?.rule
+                : catalog.get(event.giftId);
+            if (
+                event.giftPolicy &&
+                event.giftRuleId !== (match?.rule ? resolvedKey : null)
+            ) {
+                remember();
+                return result('rejected', 'GIFT_RULE_CONFLICT', identity);
+            }
             const activeSequence =
                 key === null ? undefined : sequences.get(key);
             if (
                 activeSequence &&
-                (activeSequence.giftId !== event.giftId ||
+                (activeSequence.giftId !== resolvedKey ||
                     activeSequence.actorId !== event.actorId)
             ) {
                 if (!activeSequence.final) activeSequence.invalid = true;
                 remember();
                 return result('rejected', 'COMBO_CONFLICT', identity);
             }
-            const rule = catalog.get(event.giftId);
             if (!rule) {
+                if (event.giftPolicy && activeSequence && !activeSequence.final)
+                    activeSequence.invalid = true;
+                remember();
+                return result(
+                    'rejected',
+                    event.giftPolicy ? match!.reason : 'UNKNOWN_GIFT',
+                    identity,
+                );
+            }
+            // Name rules cannot be addressed by a fabricated external gift ID or legacy event.
+            if (rule.match !== undefined && !event.giftPolicy) {
                 remember();
                 return result('rejected', 'UNKNOWN_GIFT', identity);
             }
@@ -177,7 +226,7 @@ export function createScoringEngine(
                 if (previousSequence) {
                     if (
                         previousSequence.invalid ||
-                        previousSequence.giftId !== event.giftId ||
+                        previousSequence.giftId !== resolvedKey ||
                         event.delivery.quantity < previousSequence.quantity ||
                         (previousSequence.final &&
                             (!event.delivery.final ||
@@ -200,7 +249,7 @@ export function createScoringEngine(
                 }
                 nextSequence = {
                     ...(event.actorId ? { actorId: event.actorId } : {}),
-                    giftId: event.giftId,
+                    giftId: resolvedKey,
                     quantity: event.delivery.quantity,
                     final: event.delivery.final,
                     invalid: false,
@@ -237,7 +286,11 @@ export function createScoringEngine(
             : {}),
         catalog: Object.freeze(
             [...catalog.values()].sort((a, b) =>
-                a.giftId < b.giftId ? -1 : a.giftId > b.giftId ? 1 : 0,
+                giftRuleKey(a) < giftRuleKey(b)
+                    ? -1
+                    : giftRuleKey(a) > giftRuleKey(b)
+                      ? 1
+                      : 0,
             ),
         ),
     });

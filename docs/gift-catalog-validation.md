@@ -2,6 +2,8 @@
 
 Duelo 3D é uma interação informal de entretenimento. Não representa pesquisa eleitoral, pesquisa representativa ou votação oficial.
 
+> Registro da Fase 5.3. Para o contrato atual, seis IDs confirmados (incluindo White Rose), oito regras por nome e o procedimento de revisão atualizado, consulte [Fase 5.4](gift-hybrid-identification.md). As contagens e o contrato abaixo descrevem a etapa anterior; o catálogo ativo permanece vazio.
+
 ## Origem e situação dos 14 presentes
 
 O PR #8 e o ajuste dos comentários 13/22 foram confirmados na main `4cb21a8a78d8a615e0df211ca2eedc6cd040ff65` antes de iniciar esta branch. Os nomes, IDs, participantes e pontos abaixo reproduzem a definição explícita do operador; não foram pesquisados, adivinhados ou alterados.

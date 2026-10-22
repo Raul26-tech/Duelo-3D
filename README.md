@@ -103,10 +103,12 @@ Contratos, campos inspecionados, incertezas de combos, serviço de assinatura e 
 
 Para uma disputa real autorizada, configure as variáveis documentadas no `.env.example`, incluindo `DUEL_MODE=real`, `TIKTOK_REAL_ENABLED=true`, identidade revisada, conta, sala, banco e ação `create` ou `resume`. Depois execute `npm run dev`. O `.env` nunca vai para o navegador. Não habilite real apenas para experimentar a instalação; primeiro siga o roteiro de revisão e teste controlado. Não foram enviados comentários ou presentes, nem iniciada uma LIVE durante a implementação.
 
-O catálogo é um JSON externo opcional; `config/gift-catalog.example.json` começa com `[]`. Cada entrada exige ID efetivo, participante, inteiro positivo seguro e entrega revisada. Não há associações predefinidas. Bancos e logs devem ficar fora do projeto. Reinícios exigem `resume`, mesmo contexto e mesma política; recuperação insegura bloqueia o processamento. Não existe reset ou administração de disputa real pela arena.
+O catálogo é um JSON externo opcional; `config/gift-catalog.example.json` começa com `[]`. Cada entrada exige identificação autorizada por ID confirmado ou nome exato, participante, inteiro positivo seguro e entrega revisada. Não há associações predefinidas. Bancos e logs devem ficar fora do projeto. Reinícios exigem `resume`, mesmo contexto e mesma política; recuperação insegura bloqueia o processamento. Não existe reset ou administração de disputa real pela arena.
 
-## Preparação de presentes — Fase 5.3
+## Preparação e identificação de presentes — Fases 5.3/5.4
 
-A referência dos 14 presentes está em `config/gift-catalog.reference.json`: cinco IDs observados em LIVE conforme relato do operador e nove provisórios externos. Nenhum tem entrega revisada ou aprovação automática. O catálogo operacional inicial permanece `[]`, sem alterar modo real ou disputas existentes.
+A referência dos 14 presentes está em `config/gift-catalog.reference.json`: seis IDs confirmados conforme relato do operador e oito itens preparados para identificação por nome exato; seus IDs antigos são somente históricos. Nenhum tem entrega revisada ou aprovação automática. O catálogo operacional inicial permanece `[]`, sem alterar modo real ou disputas existentes.
 
 Use `npm run catalog:gifts -- list`, `template`, `validate`, `prepare` e `verify` para a revisão local e geração exclusiva de arquivo novo. O diagnóstico existente possui um relatório agregado opcional de presentes, sem pontuação e sem dados pessoais. Procedimentos, campos e limitações: [docs/gift-catalog-validation.md](docs/gift-catalog-validation.md).
+
+A identificação híbrida e sua ativação controlada estão em [docs/gift-hybrid-identification.md](docs/gift-hybrid-identification.md). A CLI mantém revisões legadas por ID e prepara novos itens `id`/`exact-name` sem aprová-los automaticamente. Há 14 presentes preparados e zero autorizados por padrão. Entrega validada é requisito separado; nomes literais não dispensam identidade, deduplicação ou finalização. Catálogos novos não são aplicados a disputas antigas silenciosamente.

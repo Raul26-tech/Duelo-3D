@@ -57,18 +57,51 @@ export function startRealRuntime(options: {
     let blocked = false;
     let reportWindow = Date.now();
     let reports = 0;
-    function report(reason: string, decision?: Decision) {
+    const suppressed = new Map<string, number>();
+    function flushSuppressed() {
+        if (suppressed.size) {
+            try {
+                options.writeDiagnostic?.(
+                    JSON.stringify({
+                        category: 'real_ingress_suppressed',
+                        domain: 'real',
+                        counts: Object.fromEntries(suppressed),
+                    }),
+                );
+            } catch {
+                /* Diagnostics never affect committed state. */
+            }
+            suppressed.clear();
+        }
+    }
+    function report(
+        reason: string,
+        decision?: Decision,
+        matchMode?: 'id' | 'exact-name',
+    ) {
         if (Date.now() - reportWindow >= 1000) {
+            flushSuppressed();
             reports = 0;
             reportWindow = Date.now();
         }
-        if (++reports > 20) return;
+        if (++reports > 20) {
+            if (suppressed.has(reason) || suppressed.size < 32)
+                suppressed.set(
+                    reason,
+                    Math.min(
+                        Number.MAX_SAFE_INTEGER,
+                        (suppressed.get(reason) ?? 0) + 1,
+                    ),
+                );
+            return;
+        }
         try {
             options.writeDiagnostic?.(
                 JSON.stringify({
                     category: 'real_ingress',
                     domain: 'real',
                     reason,
+                    ...(matchMode ? { matchMode } : {}),
                     status: decision?.status ?? 'rejected',
                     version: decision?.state.version ?? null,
                 }),
@@ -102,7 +135,7 @@ export function startRealRuntime(options: {
                     config.gifts,
                 );
                 if (!result.event) {
-                    report(result.reason);
+                    report(result.reason, undefined, result.matchMode);
                     return;
                 } // Observer still diagnoses rejected/unknown deliveries, never scores them.
                 let decision: Decision;
@@ -115,7 +148,14 @@ export function startRealRuntime(options: {
                         'Persistence failure; real processing blocked',
                     );
                 }
-                report(decision.reason, decision);
+                report(decision.reason, decision, result.matchMode);
+                if (
+                    result.matchReason &&
+                    (decision.status === 'applied' ||
+                        !result.matchReason.startsWith('MATCH_')) &&
+                    result.matchReason !== decision.reason
+                )
+                    report(result.matchReason, decision, result.matchMode);
                 // Once committed a failed publication cannot roll back or re-apply the occurrence.
                 // Close viewers so they reconcile by a fresh persisted snapshot.
                 try {
@@ -128,7 +168,10 @@ export function startRealRuntime(options: {
             },
         },
     });
-    const tick = setInterval(() => observer.tick(), 1000);
+    const tick = setInterval(() => {
+        flushSuppressed();
+        observer.tick();
+    }, 1000);
     tick.unref();
     client.start();
     let closing: Promise<void> | undefined;
@@ -139,6 +182,7 @@ export function startRealRuntime(options: {
             if (!closing)
                 closing = (async () => {
                     clearInterval(tick);
+                    flushSuppressed();
                     arena.close();
                     await client.stop();
                     storage.close();
