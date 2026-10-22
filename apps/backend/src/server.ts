@@ -1,7 +1,12 @@
-import { createServer } from 'node:http';
+import {
+    createServer,
+    type IncomingMessage,
+    type ServerResponse,
+} from 'node:http';
 
 export function createBackendServer(
     mode: 'simulation' | 'observation' | 'real' = 'simulation',
+    fallback?: (request: IncomingMessage, response: ServerResponse) => boolean,
 ) {
     return createServer((request, response) => {
         response.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -21,6 +26,7 @@ export function createBackendServer(
             );
             return;
         }
+        if (fallback?.(request, response)) return;
         response.writeHead(404);
         response.end(JSON.stringify({ error: 'not_found' }));
     });

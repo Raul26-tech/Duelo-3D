@@ -62,3 +62,7 @@ Correção é estorno confirmado seguido de novo lançamento vinculado, com duas
 Os quatro presentes autorizados relatados pelo operador continuam dependendo do catálogo privado existente. Os dez pendentes não foram promovidos. Nenhuma LIVE foi iniciada/conectada, presente comprado, banco real acessado ou fase posterior iniciada.
 
 Ativação e recuperação: [admin-manual-scoring.md](admin-manual-scoring.md).
+
+## Ajuste do PR #11 — inicializador de homologação isolada
+
+A validação posterior do inicializador está em [admin-homologation.md](admin-homologation.md). Node 24.15.0/npm 11.9.0: `npm ci`, `npm audit` (zero vulnerabilidades), build, 301/301 testes (292 anteriores e nove novos), check:media e format:check aprovados. Comando npm com provedor inerte, bundles reais, SQLite temporário, autenticação, operações, recuperação, WebSocket e SIGINT do grupo comprovados offline. A limitação de encaminhamento de Ctrl+C pelo terminal virtual está registrada no procedimento. Sem acesso a LIVE, `.env` operacional, catálogos privados ou bancos do operador; conferência visual interativa permanece pendente.

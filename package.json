@@ -22,7 +22,9 @@
         "format:check": "prettier --check .",
         "diagnose:tiktok": "npm run diagnose:tiktok --workspace backend",
         "catalog:gifts": "npm run catalog:gifts --workspace backend --",
-        "admin:credential": "npm run admin:credential --workspace backend --"
+        "admin:credential": "npm run admin:credential --workspace backend --",
+        "homologate:admin": "npm run homologate:admin --workspace backend --",
+        "build:homologation": "npm run build:homologation --workspace frontend"
     },
     "devDependencies": {
         "prettier": "3.9.10"

@@ -16,6 +16,7 @@
         "tests",
         "vite.config.ts",
         "admin",
-        "vite.admin.config.ts"
+        "vite.admin.config.ts",
+        "vite.homologation.config.ts"
     ]
 }

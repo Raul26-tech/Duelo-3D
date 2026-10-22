@@ -105,3 +105,7 @@ npm run format:check
 Testes offline usam provedor falso, bancos temporários e credenciais sintéticas. Incluem fluxo HTTP autenticado → motor → SQLite → arena, idempotência, estorno, correção, rollback, falha de publicação, legado, retomada, conflitos de identidade, CSRF e DOM administrativo. Não dependem de LIVE, presentes pagos ou dados privados.
 
 Conector TikTok, aliases 13/22, catálogo híbrido e arena permanecem compatíveis. As permissões de simulação não administram a disputa real. Nenhum dos dez presentes pendentes é ativado por esta fase. Não houve nova conexão LIVE, alteração de banco do operador ou uso do TikFinity como validação.
+
+## Homologação sem ambiente operacional
+
+O comando `npm run homologate:admin -- --isolated --credential /caminho/credencial-de-teste.json` reutiliza este painel e o runtime existentes com provedor sintético, catálogo fictício e banco SQLite temporário exclusivo. Não exige nem lê o `.env` operacional. Prepare os bundles com `npm run build:homologation` e siga [o procedimento de homologação](admin-homologation.md), incluindo recuperação por `r`, invalidação de sessões e limpeza por Ctrl+C. Este fluxo não altera os requisitos ou a configuração de ativação da administração operacional descritos acima.

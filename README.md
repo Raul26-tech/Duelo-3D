@@ -118,3 +118,14 @@ A identificação híbrida e sua ativação controlada estão em [docs/gift-hybr
 Painel separado em `http://127.0.0.2:3001/admin/`, desligado por padrão. Usa credencial privada externa, sessão HttpOnly, Origin/CSRF, catálogo operacional autorizado e a mesma autoridade SQLite. Permite lançamentos manuais, histórico, estornos e correções vinculadas, com identidade própria e publicação à arena somente após commit. Não aprova presentes ou reinicializa disputas.
 
 Crie a credencial com `npm run admin:credential -- --operator NOME --output /caminho/novo.json`, fornecendo a senha por stdin sem eco. Configure `ADMIN_ENABLED`, `ADMIN_PORT` e `ADMIN_CREDENTIAL_FILE` no `.env` local da raiz, mantendo os dados privados da disputa existente e `resume`. O build administrativo é separado e incluído nos scripts usuais; a arena continua em 127.0.0.1. Procedimento, contratos, recuperação histórica e limites em [docs/admin-manual-scoring.md](docs/admin-manual-scoring.md).
+
+## Homologação visual isolada do painel
+
+Para conferir o painel sem TikTok, `.env` operacional ou banco do operador, use uma credencial **externa de teste** criada pela CLI existente:
+
+```bash
+npm run build:homologation
+npm run homologate:admin -- --isolated --credential /caminho/credencial-de-teste.json
+```
+
+Painel em http://127.0.0.2:3001/admin/ e arena em http://127.0.0.1:5173/. Usa provedor sintético, duas regras fictícias e SQLite temporário exclusivo. `r` + Enter recupera a mesma disputa e exige novo login; Ctrl+C fecha os servidores e remove o banco descartável. Variáveis operacionais exportadas causam recusa, sem ler ou alterar o `.env`. Credencial, passos de conferência e limites: [docs/admin-homologation.md](docs/admin-homologation.md).
