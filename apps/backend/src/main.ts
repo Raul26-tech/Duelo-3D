@@ -8,6 +8,8 @@ if (!['simulation', 'observation', 'real'].includes(mode))
     throw new Error('Invalid DUEL_MODE');
 if (mode !== 'real' && process.env.TIKTOK_REAL_ENABLED === 'true')
     throw new Error('Real scoring requires DUEL_MODE=real');
+if (mode !== 'real' && process.env.TIKTOK_EXPERIMENTAL_ENABLED === 'true')
+    throw new Error('Experimental scoring requires explicit real runtime');
 let adminConfig: ReturnType<
     typeof import('./admin/server.ts').readAdministrationConfig
 > = null;
@@ -87,7 +89,10 @@ if (mode === 'real' || mode === 'observation') {
                 credential: adminConfig.credential,
                 service: runtime.administration,
                 gifts: config.gifts,
-                connection: runtime.state,
+                connection: () =>
+                    config.experiment
+                        ? `HOMOLOGAÇÃO EXPERIMENTAL — ${runtime.state()}`
+                        : runtime.state(),
                 assets: () => (assets ??= loadAdministrationAssets()),
             });
             administration.server.on('error', () => {
@@ -100,6 +105,10 @@ if (mode === 'real' || mode === 'observation') {
                 ),
             );
         }
+        if (config.experiment)
+            console.log(
+                'HOMOLOGAÇÃO EXPERIMENTAL: hipóteses de entrega não são validação operacional.',
+            );
         console.log(
             'REAL: arena somente leitura; fonte TikTok e disputa persistida vinculadas.',
         );

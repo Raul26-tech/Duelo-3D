@@ -378,3 +378,97 @@ export function assessGiftEvidence(
         );
     return assessment;
 }
+
+/** A runtime report may describe committed points, but is never an input event or an approval. */
+export function assessRuntimeEvidence(
+    reference: readonly ReferenceGift[],
+    input: unknown,
+) {
+    if (
+        !record(input) ||
+        !exact(input, [
+            'schema',
+            'purpose',
+            'scoringEligible',
+            'authorizationGranted',
+            'durationLimitMs',
+            'elapsedMs',
+            'ended',
+            'sampledOutcomes',
+            'droppedOutcomes',
+            'observation',
+            'outcomes',
+            'saved',
+        ]) ||
+        input.schema !== 'real-runtime-report-v1' ||
+        !['experimental', 'validated'].includes(input.purpose as string) ||
+        input.scoringEligible !== false ||
+        input.authorizationGranted !== false ||
+        !count(input.durationLimitMs, 35 * 60000) ||
+        input.durationLimitMs < 60000 ||
+        !count(input.elapsedMs, input.durationLimitMs) ||
+        ![
+            null,
+            'operator_stop',
+            'duration_limit',
+            'sample_limit',
+            'startup_failed',
+        ].includes(input.ended as string | null) ||
+        !count(input.sampledOutcomes) ||
+        !count(input.droppedOutcomes, Number.MAX_SAFE_INTEGER) ||
+        typeof input.saved !== 'boolean' ||
+        !Array.isArray(input.outcomes) ||
+        input.outcomes.length > 64
+    )
+        throw new Error('Invalid bounded runtime report');
+    let total = 0;
+    for (const row of input.outcomes) {
+        if (
+            !record(row) ||
+            !exact(row, [
+                'giftId',
+                'name',
+                'reason',
+                'status',
+                'notifications',
+                'matchMode',
+                'lastCommittedVersion',
+            ]) ||
+            !(
+                row.giftId === null ||
+                (typeof row.giftId === 'string' && providerId(row.giftId))
+            ) ||
+            !(row.name === null || publicName(row.name)) ||
+            typeof row.reason !== 'string' ||
+            !/^[A-Z][A-Z0-9_]{0,63}$/u.test(row.reason) ||
+            !['applied', 'rejected', 'ignored', 'duplicate'].includes(
+                row.status as string,
+            ) ||
+            !count(row.notifications) ||
+            row.notifications < 1 ||
+            ![null, 'id', 'exact-name'].includes(
+                row.matchMode as string | null,
+            ) ||
+            !(
+                row.lastCommittedVersion === null ||
+                count(row.lastCommittedVersion, Number.MAX_SAFE_INTEGER)
+            )
+        )
+            throw new Error('Invalid runtime outcome');
+        total += row.notifications;
+    }
+    if (total > input.sampledOutcomes)
+        throw new Error('Contradictory runtime outcome totals');
+    const assessment = {
+        ...assessGiftEvidence(reference, input.observation),
+        runtimePurpose: input.purpose,
+        runtimeEnded: input.ended,
+        runtimeOutcomes: structuredClone(input.outcomes),
+        runtimeDroppedOutcomes: input.droppedOutcomes,
+    };
+    if (Buffer.byteLength(JSON.stringify(assessment, null, 4)) > 60000)
+        throw new Error(
+            'Runtime assessment exceeds bounded output; use a shorter collection',
+        );
+    return assessment;
+}

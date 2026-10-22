@@ -1,3 +1,4 @@
+import { createRuntimeReport } from './runtime-report.ts';
 import { createAdministrationService } from '../admin/service.ts';
 import type { Server } from 'node:http';
 import { openSqliteScoring } from '../persistence/sqlite.ts';
@@ -24,7 +25,30 @@ export function startRealRuntime(options: {
     afterCommit?: (decision: Decision) => void;
 }) {
     const config = options.config;
-    const lease = acquireAuthority(config.filename);
+    const safeWrite = (line: string) => {
+        try {
+            options.writeDiagnostic?.(line);
+        } catch {
+            /* Observability never changes scoring. */
+        }
+    };
+    const logger = createDiagnosticLogger(safeWrite);
+    const baseObserver = createEventObserver(logger);
+    const diagnostic = config.runtimeReport
+        ? createRuntimeReport(
+              config.runtimeReport,
+              config.experiment ? 'experimental' : 'validated',
+              baseObserver,
+              safeWrite,
+          )
+        : undefined;
+    let lease: ReturnType<typeof acquireAuthority>;
+    try {
+        lease = acquireAuthority(config.filename);
+    } catch (error) {
+        diagnostic?.finish('startup_failed');
+        throw error;
+    }
     const release = lease.release;
     let storage: ReturnType<typeof openSqliteScoring>;
     try {
@@ -44,6 +68,7 @@ export function startRealRuntime(options: {
         });
     } catch (error) {
         release();
+        diagnostic?.finish('startup_failed');
         throw error;
     }
     const snapshot = () => {
@@ -51,10 +76,7 @@ export function startRealRuntime(options: {
         return storage.snapshot();
     };
     const arena = attachRealArena(options.server, options.origin, snapshot);
-    const logger = createDiagnosticLogger(
-        options.writeDiagnostic ?? (() => {}),
-    );
-    const observer = createEventObserver(logger);
+    const observer = diagnostic?.observer ?? baseObserver;
     let blocked = false;
     let reportWindow = Date.now();
     let reports = 0;
@@ -152,6 +174,15 @@ export function startRealRuntime(options: {
                     config.gifts,
                 );
                 if (!result.event) {
+                    diagnostic?.record(
+                        kind,
+                        payload,
+                        roomId,
+                        result.reason,
+                        'rejected',
+                        null,
+                        result.matchMode,
+                    );
                     report(result.reason, undefined, result.matchMode);
                     return;
                 } // Observer still diagnoses rejected/unknown deliveries, never scores them.
@@ -160,11 +191,29 @@ export function startRealRuntime(options: {
                     decision = storage.process(result.event);
                 } catch {
                     blocked = true;
+                    diagnostic?.record(
+                        kind,
+                        payload,
+                        roomId,
+                        'PERSISTENCE_BLOCKED',
+                        'rejected',
+                        null,
+                        result.matchMode,
+                    );
                     report('PERSISTENCE_BLOCKED');
                     throw new Error(
                         'Persistence failure; real processing blocked',
                     );
                 }
+                diagnostic?.record(
+                    kind,
+                    payload,
+                    roomId,
+                    decision.reason,
+                    decision.status,
+                    decision.state.version,
+                    result.matchMode,
+                );
                 report(decision.reason, decision, result.matchMode);
                 if (
                     result.matchReason &&
@@ -188,12 +237,14 @@ export function startRealRuntime(options: {
     const tick = setInterval(() => {
         flushSuppressed();
         observer.tick();
+        diagnostic?.tick();
     }, 1000);
     tick.unref();
     client.start();
     let closing: Promise<void> | undefined;
     return {
         snapshot,
+        diagnosticReport: () => diagnostic?.snapshot(),
         administration,
         state: client.state,
         close() {
@@ -203,6 +254,7 @@ export function startRealRuntime(options: {
                     flushSuppressed();
                     arena.close();
                     await client.stop();
+                    diagnostic?.finish('operator_stop');
                     storage.close();
                     release();
                 })();

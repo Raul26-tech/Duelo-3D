@@ -1,5 +1,5 @@
 import { giftRuleKey } from '../scoring/catalog.ts';
-import { parseReviewedCatalog } from '../integration/config.ts';
+import { parseReviewedCatalog } from '../integration/gift-policy.ts';
 import { prepareActive, type ReferenceGift } from './catalog.ts';
 
 // Public operator report, not a grant of authority and never loaded by the runtime.

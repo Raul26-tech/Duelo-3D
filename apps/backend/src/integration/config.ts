@@ -1,16 +1,15 @@
+import { parseReviewedCatalog, type ReviewedGift } from './gift-policy.ts';
+export { parseReviewedCatalog, type ReviewedGift } from './gift-policy.ts';
+import { parseExperimentManifest } from '../catalog-tools/experiment.ts';
+import { readLocalJson } from '../local-json.ts';
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createGiftCatalog, giftRuleKey } from '../scoring/catalog.ts';
-import type { CatalogGiftRule } from '../scoring/contracts.ts';
-import { record } from '../scoring/validation.ts';
 import { providerId } from '../tiktok/normalize.ts';
 import { readDiagnosticConfig } from '../tiktok/config.ts';
 
 export type OperationMode = 'simulation' | 'observation' | 'real';
-export type ReviewedGift = CatalogGiftRule &
-    Readonly<{ delivery: 'single' | 'cumulative-final' }>;
 export type RealConfig = Readonly<{
     mode: 'real';
     username: string;
@@ -20,50 +19,11 @@ export type RealConfig = Readonly<{
     action: 'create' | 'resume';
     gifts: readonly ReviewedGift[];
     sourcePolicy: string;
+    experiment?: Readonly<{ digest: string }>;
+    runtimeReport?: Readonly<{ filename: string; durationMs: number }>;
 }>;
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 
-export function parseReviewedCatalog(value: unknown): readonly ReviewedGift[] {
-    if (!Array.isArray(value) || value.length > 1000)
-        throw new Error('Invalid reviewed gift catalog');
-    const stripped = value.map((entry: unknown) => {
-        if (
-            !record(entry) ||
-            (entry.delivery !== 'single' &&
-                entry.delivery !== 'cumulative-final')
-        )
-            throw new Error('Each gift needs reviewed delivery');
-        const { delivery: _delivery, ...rule } = entry;
-        if (
-            rule.match !== 'exact-name' &&
-            (typeof rule.giftId !== 'string' || !providerId(rule.giftId))
-        )
-            throw new Error('Each ID gift needs a real decimal ID');
-        return rule;
-    });
-    if (new Set(stripped.map((rule) => rule.name)).size !== stripped.length)
-        throw new Error('Ambiguous duplicate gift names');
-    const catalog = createGiftCatalog(stripped);
-    return Object.freeze(
-        value
-            .map(
-                (entry, index) =>
-                    Object.freeze({
-                        ...catalog.get(
-                            giftRuleKey(stripped[index] as CatalogGiftRule),
-                        )!,
-                        delivery: entry.delivery,
-                    }) as ReviewedGift,
-            )
-            .sort((a, b) =>
-                giftRuleKey(a) < giftRuleKey(b)
-                    ? -1
-                    : giftRuleKey(a) > giftRuleKey(b)
-                      ? 1
-                      : 0,
-            ),
-    );
-}
 export function readOperationMode(
     env: NodeJS.ProcessEnv = process.env,
 ): OperationMode {
@@ -105,7 +65,51 @@ export function readRealConfig(
         throw new Error(
             'TIKTOK_DATABASE must be an absolute path outside the repository',
         );
+    const experimental = env.TIKTOK_EXPERIMENTAL_ENABLED ?? 'false';
+    if (experimental !== 'false' && experimental !== 'true')
+        throw new Error('TIKTOK_EXPERIMENTAL_ENABLED must be true or false');
+    if (experimental !== 'true' && env.TIKTOK_EXPERIMENT_MANIFEST)
+        throw new Error(
+            'Experimental manifest requires explicit experimental opt-in',
+        );
+    if (
+        experimental === 'true' &&
+        (!env.TIKTOK_EXPERIMENT_MANIFEST || env.TIKTOK_GIFT_CATALOG)
+    )
+        throw new Error(
+            'Choose experimental manifest OR validated catalog explicitly',
+        );
+    let experiment: RealConfig['experiment'];
     let gifts: readonly ReviewedGift[] = Object.freeze([]);
+    if (experimental === 'true') {
+        const path = env.TIKTOK_EXPERIMENT_MANIFEST!;
+        if (!path.startsWith('/'))
+            throw new Error(
+                'Experimental manifest must be an explicit absolute path',
+            );
+        const checked = parseExperimentManifest(readLocalJson(path));
+        gifts = checked.manifest.rules;
+        experiment = Object.freeze({ digest: checked.digest });
+    }
+    let runtimeReport: RealConfig['runtimeReport'];
+    if (env.TIKTOK_RUNTIME_REPORT) {
+        const minutes = env.TIKTOK_RUNTIME_REPORT_MINUTES ?? '35';
+        if (
+            !/^[0-9]+$/u.test(minutes) ||
+            Number(minutes) < 1 ||
+            Number(minutes) > 35 ||
+            !env.TIKTOK_RUNTIME_REPORT.startsWith('/') ||
+            !env.TIKTOK_RUNTIME_REPORT.endsWith('.json')
+        )
+            throw new Error(
+                'Runtime report requires an external new JSON file and duration 1–35 minutes',
+            );
+        runtimeReport = Object.freeze({
+            filename: env.TIKTOK_RUNTIME_REPORT,
+            durationMs: Number(minutes) * 60000,
+        });
+    } else if (env.TIKTOK_RUNTIME_REPORT_MINUTES)
+        throw new Error('Runtime report duration requires an output file');
     if (env.TIKTOK_GIFT_CATALOG) {
         const path = resolve(root, env.TIKTOK_GIFT_CATALOG);
         if (statSync(path).size > 65536)
@@ -122,6 +126,7 @@ export function readRealConfig(
                 username: provider.username,
                 roomId,
                 gifts,
+                ...(experiment ? { experimental: experiment.digest } : {}),
             }),
         )
         .digest('hex');
@@ -134,5 +139,7 @@ export function readRealConfig(
         action,
         gifts,
         sourcePolicy,
+        ...(experiment ? { experiment } : {}),
+        ...(runtimeReport ? { runtimeReport } : {}),
     });
 }
