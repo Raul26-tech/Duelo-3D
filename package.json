@@ -21,7 +21,8 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "diagnose:tiktok": "npm run diagnose:tiktok --workspace backend",
-        "catalog:gifts": "npm run catalog:gifts --workspace backend --"
+        "catalog:gifts": "npm run catalog:gifts --workspace backend --",
+        "admin:credential": "npm run admin:credential --workspace backend --"
     },
     "devDependencies": {
         "prettier": "3.9.10"

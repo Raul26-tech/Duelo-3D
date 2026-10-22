@@ -1,3 +1,4 @@
+import { isAdminEvent } from '../scoring/administration.ts';
 import { createScoringEngine, type EngineOptions } from '../scoring/engine.ts';
 import { eventIdentity, parseEvent } from '../scoring/validation.ts';
 import {
@@ -121,10 +122,27 @@ export function createScoringCoordinator(
                         throw new ScoringIntegrityError(
                             'transition has no normalized event',
                         );
-                    tx.append(event, after);
+                    const recorded = isAdminEvent(event)
+                        ? parseEvent({
+                              ...event,
+                              appliedPoints: decision.points,
+                          })
+                        : event;
+                    if (!recorded)
+                        throw new ScoringIntegrityError('invalid audit result');
+                    tx.append(recorded, after);
                 }
                 return decision;
             }); // Adapter returns only after COMMIT. Publication belongs to the caller.
+        },
+        administrationView() {
+            return transact((tx) => {
+                const engine = recover(tx);
+                return {
+                    state: engine.snapshot(),
+                    operations: engine.auditHistory(),
+                };
+            });
         },
         snapshot() {
             return transact((tx) => recover(tx).snapshot());

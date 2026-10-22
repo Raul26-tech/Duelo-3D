@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Duelo 3D — Administração</title>
+    </head>
+    <body>
+        <header>
+            <div class="brand">DUELO <span>3D</span></div>
+            <p>Administração local · operações auditáveis</p>
+            <button id="logout" hidden>Sair</button>
+        </header>
+        <main>
+            <section id="login" class="card narrow">
+                <h1>Acesso do operador</h1>
+                <p>
+                    Use sua credencial local. A administração não habilita
+                    presentes pendentes.
+                </p>
+                <form id="login-form">
+                    <label
+                        >Operador<input
+                            id="operator"
+                            autocomplete="username"
+                            required
+                            maxlength="64" /></label
+                    ><label
+                        >Senha<input
+                            id="password"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                            maxlength="1024" /></label
+                    ><button>Entrar</button>
+                </form>
+            </section>
+            <p id="message" role="status" aria-live="polite"></p>
+            <div id="panel" hidden>
+                <div class="heading">
+                    <div>
+                        <h1>Controle da disputa</h1>
+                        <p id="connection"></p>
+                        <small id="session"></small>
+                    </div>
+                    <p id="signed-in"></p>
+                </div>
+                <section class="scores" aria-label="Placar persistido">
+                    <article class="card red">
+                        <h2>Lula</h2>
+                        <strong id="lula">0</strong>
+                    </article>
+                    <article class="card blue">
+                        <h2>Flávio</h2>
+                        <strong id="flavio">0</strong>
+                    </article>
+                </section>
+                <section class="card">
+                    <h2>Lançamento manual</h2>
+                    <p>
+                        Os pontos são calculados no servidor pelo catálogo
+                        autorizado. Operações administrativas são diferentes de
+                        eventos TikTok.
+                    </p>
+                    <form id="award-form">
+                        <div class="grid">
+                            <label
+                                >Participante<select id="candidate">
+                                    <option value="lula">Lula</option>
+                                    <option value="flavio">Flávio</option>
+                                </select></label
+                            ><label
+                                >Presente autorizado<select
+                                    id="rule"
+                                    required
+                                ></select></label
+                            ><label
+                                >Quantidade<input
+                                    id="quantity"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value="1"
+                                    required
+                            /></label>
+                        </div>
+                        <label
+                            >Justificativa<textarea
+                                id="justification"
+                                minlength="10"
+                                maxlength="1000"
+                                required
+                                placeholder="Descreva a evidência e o motivo do lançamento"
+                            ></textarea>
+                        </label>
+                        <label
+                            >Correção de operação estornada (opcional)<input
+                                id="correction"
+                                placeholder="UUID da operação original"
+                        /></label>
+                        <details>
+                            <summary>
+                                Vincular identidade de ocorrência (opcional)
+                            </summary>
+                            <p>
+                                Somente com evidência confiável da transmissão
+                                atual. A referência é uma declaração do
+                                operador, não uma confirmação do provedor. Uma
+                                ocorrência/sequência já registrada será
+                                recusada.
+                            </p>
+                            <div class="grid">
+                                <label
+                                    >ID da ocorrência<input
+                                        id="source-event"
+                                        inputmode="numeric" /></label
+                                ><label
+                                    >ID do ator<input
+                                        id="source-actor"
+                                        inputmode="numeric" /></label
+                                ><label
+                                    >groupId (se combo)<input
+                                        id="source-group"
+                                        inputmode="numeric"
+                                /></label>
+                            </div>
+                        </details>
+                        <p id="duplicates" class="notice"></p>
+                        <label class="check"
+                            ><input
+                                id="reconciled"
+                                type="checkbox"
+                                required
+                            />Revisei o histórico e reconciliei esta operação.
+                            Sem identidade compartilhada comprovada, não há
+                            deduplicação automática entre origens.</label
+                        >
+                        <button id="award-submit">Registrar pontos</button>
+                    </form>
+                </section>
+                <section id="reverse-box" class="card" hidden>
+                    <h2>Estornar operação</h2>
+                    <p id="reverse-target"></p>
+                    <form id="reverse-form">
+                        <label
+                            >Justificativa do estorno<textarea
+                                id="reverse-reason"
+                                required
+                                minlength="10"
+                                maxlength="1000"
+                            ></textarea></label
+                        ><button>Confirmar estorno integral</button
+                        ><button
+                            type="button"
+                            id="reverse-cancel"
+                            class="secondary"
+                        >
+                            Cancelar
+                        </button>
+                    </form>
+                </section>
+                <section id="uncertain" class="card" hidden>
+                    <h2>Resultado da solicitação incerto</h2>
+                    <p id="pending-id"></p>
+                    <p>
+                        Não crie outro lançamento. Consulte o histórico ou
+                        repita exatamente a mesma solicitação. O servidor
+                        garante idempotência pelo identificador.
+                    </p>
+                    <button id="retry">Reenviar a mesma operação</button>
+                </section>
+                <section class="card">
+                    <div class="heading">
+                        <h2>Histórico administrativo</h2>
+                        <button id="refresh" class="secondary">
+                            Atualizar
+                        </button>
+                    </div>
+                    <p>
+                        Estornos preservam a operação original. Para corrigir,
+                        estorne primeiro e registre um lançamento vinculado.
+                    </p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Operação / horário</th>
+                                    <th>Operador</th>
+                                    <th>Participante / regra</th>
+                                    <th>Quantidade / pontos</th>
+                                    <th>Estado / referência</th>
+                                    <th>Justificativa</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination">
+                        <button id="previous" class="secondary">Anterior</button
+                        ><span id="page"></span
+                        ><button id="next" class="secondary">Próxima</button>
+                    </div>
+                </section>
+            </div>
+            <footer>
+                Enquete informal de entretenimento. Não representa pesquisa
+                eleitoral ou votação oficial.
+            </footer>
+        </main>
+        <script type="module" src="./main.ts"></script>
+    </body>
+</html>

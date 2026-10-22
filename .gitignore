@@ -27,3 +27,5 @@ personagens-novos/
 *.sqlite3.*
 
 *.authority.lock
+
+admin-dist/

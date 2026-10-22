@@ -112,3 +112,9 @@ A referência dos 14 presentes está em `config/gift-catalog.reference.json`: se
 Use `npm run catalog:gifts -- list`, `template`, `validate`, `prepare` e `verify` para a revisão local e geração exclusiva de arquivo novo. O diagnóstico existente possui um relatório agregado opcional de presentes, sem pontuação e sem dados pessoais. Procedimentos, campos e limitações: [docs/gift-catalog-validation.md](docs/gift-catalog-validation.md).
 
 A identificação híbrida e sua ativação controlada estão em [docs/gift-hybrid-identification.md](docs/gift-hybrid-identification.md). A CLI mantém revisões legadas por ID e prepara novos itens `id`/`exact-name` sem aprová-los automaticamente. Há 14 presentes preparados e zero autorizados por padrão. Entrega validada é requisito separado; nomes literais não dispensam identidade, deduplicação ou finalização. Catálogos novos não são aplicados a disputas antigas silenciosamente.
+
+## Administração local — Fase 5.5
+
+Painel separado em `http://127.0.0.2:3001/admin/`, desligado por padrão. Usa credencial privada externa, sessão HttpOnly, Origin/CSRF, catálogo operacional autorizado e a mesma autoridade SQLite. Permite lançamentos manuais, histórico, estornos e correções vinculadas, com identidade própria e publicação à arena somente após commit. Não aprova presentes ou reinicializa disputas.
+
+Crie a credencial com `npm run admin:credential -- --operator NOME --output /caminho/novo.json`, fornecendo a senha por stdin sem eco. Configure `ADMIN_ENABLED`, `ADMIN_PORT` e `ADMIN_CREDENTIAL_FILE` no `.env` local da raiz, mantendo os dados privados da disputa existente e `resume`. O build administrativo é separado e incluído nos scripts usuais; a arena continua em 127.0.0.1. Procedimento, contratos, recuperação histórica e limites em [docs/admin-manual-scoring.md](docs/admin-manual-scoring.md).

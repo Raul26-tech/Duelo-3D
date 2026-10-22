@@ -47,8 +47,39 @@ export function createFrontendConfig(
         root,
         envDir,
         base: './',
+        plugins: [
+            {
+                name: 'isolate-administration',
+                configureServer(server) {
+                    server.middlewares.use((request, response, next) => {
+                        const path = (request.url ?? '/').split('?')[0];
+                        if (
+                            path === '/admin' ||
+                            path.startsWith('/admin/') ||
+                            path === '/admin-dist' ||
+                            path.startsWith('/admin-dist/')
+                        ) {
+                            response.statusCode = 404;
+                            response.end('Not found');
+                            return;
+                        }
+                        next();
+                    });
+                },
+            },
+        ],
         server: {
             host: '127.0.0.1',
+            fs: {
+                deny: [
+                    '.env',
+                    '.env.*',
+                    '*.{crt,pem}',
+                    '**/.git/**',
+                    '**/admin/**',
+                    '**/admin-dist/**',
+                ],
+            },
             strictPort: true,
             proxy,
             port: resolveFrontendPort(
