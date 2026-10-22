@@ -129,3 +129,9 @@ npm run homologate:admin -- --isolated --credential /caminho/credencial-de-teste
 ```
 
 Painel em http://127.0.0.2:3001/admin/ e arena em http://127.0.0.1:5173/. Usa provedor sintético, duas regras fictícias e SQLite temporário exclusivo. `r` + Enter recupera a mesma disputa e exige novo login; Ctrl+C fecha os servidores e remove o banco descartável. Variáveis operacionais exportadas causam recusa, sem ler ou alterar o `.env`. Credencial, passos de conferência e limites: [docs/admin-homologation.md](docs/admin-homologation.md).
+
+## Catálogo ampliado e validação — Fase 5.6
+
+Os 14 candidatos existentes foram preservados. `npm run catalog:gifts -- status` distingue quatro autorizações relatadas pelo operador de dez pendências, sem carregar ou criar um catálogo ativo. Doughnut e Tiny Diny completam os oito nomes literais pendentes. O diagnóstico existente aceita `--no-env` e produz evidências agregadas limitadas; `catalog:gifts assess` prepara a revisão humana, e `extend` exige revisões completas e preservação das regras anteriores para gerar um arquivo candidato novo.
+
+Nenhuma autorização automática, conexão real, alteração de `.env`, preparação de LIVE ou criação de disputa operacional faz parte desta fase. A mudança de catálogo continua sujeita ao contexto imutável do SQLite. Tabela dos 14 presentes, políticas ainda desconhecidas, comandos e procedimento supervisionado: [docs/gift-catalog-phase56.md](docs/gift-catalog-phase56.md).

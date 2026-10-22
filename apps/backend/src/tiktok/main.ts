@@ -13,7 +13,22 @@ const logger = createDiagnosticLogger((line) => {
         process.stdout.write(`${line}\n`);
 });
 try {
-    loadOptionalEnv();
+    const args = process.argv.slice(2);
+    if (args.length > 1 || (args.length === 1 && args[0] !== '--no-env'))
+        throw new Error('Invalid diagnostic arguments');
+    if (args[0] === '--no-env') {
+        if (
+            (process.env.DUEL_MODE !== undefined &&
+                process.env.DUEL_MODE !== 'observation') ||
+            process.env.TIKTOK_REAL_ENABLED === 'true' ||
+            process.env.ADMIN_ENABLED === 'true' ||
+            process.env.TIKTOK_DATABASE ||
+            process.env.TIKTOK_GIFT_CATALOG
+        )
+            throw new Error(
+                'Observation requires an isolated diagnostic environment',
+            );
+    } else loadOptionalEnv();
     const config = readDiagnosticConfig();
     if (!config.enabled) logger.lifecycle('disabled', 0);
     else {

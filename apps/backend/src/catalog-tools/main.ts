@@ -1,3 +1,5 @@
+import { catalogStatus, prepareExtension } from './phase56.ts';
+import { assessGiftEvidence } from './evidence.ts';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -11,14 +13,49 @@ import {
 import { readLocalJson, writeNewLocalJson } from '../local-json.ts';
 
 const usage =
-    'catalog:gifts: list [reviews.json] | template --output /new/reviews.json | validate reviews.json | prepare reviews.json --output /new/active.json | verify reviews.json active.json';
+    'catalog:gifts: list [reviews.json] | template --output /new/reviews.json | validate reviews.json | prepare reviews.json --output /new/active.json | verify reviews.json active.json | status [active.json] | assess report.json --output /new/assessment.json | extend active.json full-reviews.json --output /new/active.json';
 export function runCatalogCli(
     args: string[],
     write: (line: string) => void = console.log,
 ) {
     const reference = loadReference();
     const [command, ...rest] = args;
-    if (command === 'list' && rest.length <= 1) {
+    if (command === 'status' && rest.length <= 1) {
+        write(
+            JSON.stringify(
+                catalogStatus(
+                    reference,
+                    rest.length ? readLocalJson(rest[0]) : undefined,
+                ),
+                null,
+                4,
+            ),
+        );
+    } else if (
+        command === 'assess' &&
+        rest.length === 3 &&
+        rest[1] === '--output'
+    ) {
+        writeNewLocalJson(
+            rest[2],
+            assessGiftEvidence(reference, readLocalJson(rest[0])),
+        );
+        write('Observation assessment created; zero authorizations granted.');
+    } else if (
+        command === 'extend' &&
+        rest.length === 4 &&
+        rest[2] === '--output'
+    ) {
+        const active = prepareExtension(
+            reference,
+            readLocalJson(rest[0]),
+            readLocalJson(rest[1]),
+        );
+        writeNewLocalJson(rest[3], active);
+        write(
+            `New candidate catalog created: ${active.length} explicitly reviewed rules; existing rules preserved. No environment or dispute modified.`,
+        );
+    } else if (command === 'list' && rest.length <= 1) {
         const reviews = rest.length
             ? parseReviews(readLocalJson(rest[0]), reference)
             : reviewTemplate(reference);
