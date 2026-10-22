@@ -5,6 +5,7 @@ import { readLocalJson } from '../local-json.ts';
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isLocalAbsolutePath } from '../private-files.ts';
 import { fileURLToPath } from 'node:url';
 import { providerId } from '../tiktok/normalize.ts';
 import { readDiagnosticConfig } from '../tiktok/config.ts';
@@ -61,7 +62,7 @@ export function readRealConfig(
         throw new Error(
             'TIKTOK_SESSION_ACTION must be create or resume explicitly',
         );
-    if (!env.TIKTOK_DATABASE || !env.TIKTOK_DATABASE.startsWith('/'))
+    if (!env.TIKTOK_DATABASE || !isLocalAbsolutePath(env.TIKTOK_DATABASE))
         throw new Error(
             'TIKTOK_DATABASE must be an absolute path outside the repository',
         );
@@ -83,7 +84,7 @@ export function readRealConfig(
     let gifts: readonly ReviewedGift[] = Object.freeze([]);
     if (experimental === 'true') {
         const path = env.TIKTOK_EXPERIMENT_MANIFEST!;
-        if (!path.startsWith('/'))
+        if (!isLocalAbsolutePath(path))
             throw new Error(
                 'Experimental manifest must be an explicit absolute path',
             );
@@ -98,7 +99,7 @@ export function readRealConfig(
             !/^[0-9]+$/u.test(minutes) ||
             Number(minutes) < 1 ||
             Number(minutes) > 35 ||
-            !env.TIKTOK_RUNTIME_REPORT.startsWith('/') ||
+            !isLocalAbsolutePath(env.TIKTOK_RUNTIME_REPORT) ||
             !env.TIKTOK_RUNTIME_REPORT.endsWith('.json')
         )
             throw new Error(

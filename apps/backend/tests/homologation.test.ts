@@ -1,16 +1,19 @@
+import { npmArguments } from './helpers/platform.ts';
+import { writeNewLocalJson } from '../src/local-json.ts';
+import { assertPrivateFile } from '../src/private-files.ts';
+import { defer, track } from './helpers/resources.ts';
 import test, { before, after, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     mkdtempSync,
     rmSync,
-    writeFileSync,
     existsSync,
     statSync,
     readFileSync,
     readdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { request, createServer } from 'node:http';
 import { once } from 'node:events';
@@ -32,17 +35,18 @@ before(() => {
     process.env.NODE_ENV = 'test';
     directory = mkdtempSync(join(tmpdir(), 'duelo-homologation-test-'));
     credentialFile = join(directory, 'test-credential.json');
-    writeFileSync(
-        credentialFile,
-        JSON.stringify(makeCredential('homologacao', password)),
-        { mode: 0o600 },
-    );
+    writeNewLocalJson(credentialFile, makeCredential('homologacao', password));
+    assertPrivateFile(credentialFile);
     // Tests work on a fresh npm ci, using the actual compiled UI, not a mock page.
-    const result = spawnSync('npm', ['run', 'build:homologation'], {
-        cwd: root,
-        encoding: 'utf8',
-        timeout: 60000,
-    });
+    const result = spawnSync(
+        process.execPath,
+        npmArguments(['run', 'build:homologation']),
+        {
+            cwd: root,
+            encoding: 'utf8',
+            timeout: 60000,
+        },
+    );
     assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -91,7 +95,7 @@ async function rig(t: TestContext) {
         credentialFile,
         testPorts: { arena: 0, administration: 0 },
     });
-    t.after(() => app.close());
+    defer(t, () => app.close());
     return app;
 }
 async function authenticated(base: string) {
@@ -190,16 +194,18 @@ test('homologação: ProviderClient sintético não emite eventos nem importa SD
 
 test('homologação: banco temporário privado, autoridade isolada e limpeza idempotente', async (t) => {
     const app = await rig(t);
-    assert.ok(app.filename.startsWith(app.directory + '/'));
+    assert.equal(relative(app.directory, app.filename), 'homologation.sqlite');
     assert.equal(app.filename, join(app.directory, 'homologation.sqlite'));
     assert.ok(!app.directory.startsWith(root));
-    assert.equal(statSync(app.directory).mode & 0o777, 0o700);
+    if (process.platform !== 'win32')
+        assert.equal(statSync(app.directory).mode & 0o777, 0o700);
+    assertPrivateFile(credentialFile);
     assert.equal(statSync(app.filename).mode & 0o077, 0);
     assert.ok(
         !app.filename.includes('live-fase54-tuneldotempodjtim-01.sqlite'),
     );
     assert.ok(existsSync(app.filename + '.authority.lock'));
-    const db = new Database(app.filename, { readonly: true });
+    const db = track(t, new Database(app.filename, { readonly: true }));
     assert.equal(
         (db.prepare('SELECT domain FROM dispute').get() as { domain: string })
             .domain,
@@ -322,7 +328,7 @@ test('homologação: lançamento, idempotência, histórico, estorno, correção
         origin: app.arenaUrl,
         agent: false,
     });
-    t.after(() => ws.terminate());
+    defer(t, () => ws.terminate());
     const [initial] = await once(ws, 'message');
     assert.equal(JSON.parse(initial.toString()).state.scores.a, 0);
     const update = once(ws, 'message');
@@ -377,7 +383,7 @@ test('homologação: lançamento, idempotência, histórico, estorno, correção
         app.arenaUrl.replace('http:', 'ws:') + '/arena',
         { origin: app.arenaUrl, agent: false },
     );
-    t.after(() => after.terminate());
+    defer(t, () => after.terminate());
     const [snapshot] = await once(after, 'message');
     assert.equal(JSON.parse(snapshot.toString()).state.scores.a, 6);
 });
@@ -387,12 +393,12 @@ test('homologação: recuperação inconsistente bloqueia sem criar outra disput
     const api = await authenticated(app.administrationUrl);
     const body = award(JSON.parse((await api('state')).text).state.sessionId);
     await api('award', body);
-    const db = new Database(app.filename);
+    const db = track(t, new Database(app.filename));
     db.exec('UPDATE dispute SET lula=lula+1');
     db.close();
     await assert.rejects(app.recover());
     await assert.rejects(app.recover(), /encerrada/);
-    const check = new Database(app.filename, { readonly: true });
+    const check = track(t, new Database(app.filename, { readonly: true }));
     assert.equal(
         (check.prepare('SELECT lula FROM dispute').get() as { lula: number })
             .lula,
@@ -409,7 +415,8 @@ test('homologação: porta ocupada falha sem alternar portas nem deixar autorida
     const occupied = createServer();
     occupied.listen(0, '127.0.0.2');
     await once(occupied, 'listening');
-    t.after(
+    defer(
+        t,
         () => new Promise<void>((resolve) => occupied.close(() => resolve())),
     );
     const address = occupied.address();
@@ -431,7 +438,7 @@ test('homologação: porta ocupada falha sem alternar portas nem deixar autorida
 });
 
 test(
-    'homologação CLI: nenhum SDK/env/rede de saída; credencial explícita, recuperação e SIGINT limpam banco/portas',
+    'homologação CLI: nenhum SDK/env/rede de saída; credencial explícita, recuperação e encerramento (SIGINT Unix/q Windows) limpam banco/portas',
     { timeout: 30000 },
     async (t) => {
         const cli = new URL('../src/admin/homologation-cli.ts', import.meta.url)
@@ -463,8 +470,12 @@ test(
         child.stderr.on('data', (data) => {
             errors += data.toString();
         });
-        t.after(() => {
-            if (child.exitCode === null) child.kill('SIGKILL');
+        defer(t, async () => {
+            if (child.exitCode === null && child.signalCode === null) {
+                const exited = once(child, 'exit');
+                child.kill('SIGKILL');
+                await exited;
+            }
         });
         const waitFor = async (text: string) => {
             const until = Date.now() + 15000;
@@ -489,7 +500,8 @@ test(
             26,
         );
         const exited = once(child, 'exit');
-        child.kill('SIGINT');
+        if (process.platform === 'win32') child.stdin.write('q\n');
+        else child.kill('SIGINT');
         assert.equal((await exited)[0], 0, errors);
         assert.equal(existsSync(temporary), false);
         await assert.rejects(http('http://127.0.0.2:3001/admin/'));
@@ -505,15 +517,15 @@ test(
     { timeout: 30000, skip: process.platform === 'win32' },
     async (t) => {
         const child = spawn(
-            'npm',
-            [
+            process.execPath,
+            npmArguments([
                 'run',
                 'homologate:admin',
                 '--',
                 '--isolated',
                 '--credential',
                 credentialFile,
-            ],
+            ]),
             {
                 cwd: root,
                 env: { ...process.env, NO_COLOR: '1' },
@@ -529,7 +541,7 @@ test(
         child.stderr.on('data', (data) => {
             errors += data.toString();
         });
-        t.after(() => {
+        defer(t, () => {
             try {
                 process.kill(-child.pid!, 'SIGKILL');
             } catch {

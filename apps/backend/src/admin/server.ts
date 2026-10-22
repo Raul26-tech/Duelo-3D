@@ -348,10 +348,18 @@ export function createAdministrationServer(options: {
     }
     return {
         server,
-        close() {
+        close(): Promise<void> {
             sessions.clear();
-            server.close();
-            server.closeAllConnections();
+            return new Promise((resolve, reject) => {
+                server.close((error) =>
+                    error &&
+                    (error as NodeJS.ErrnoException).code !==
+                        'ERR_SERVER_NOT_RUNNING'
+                        ? reject(error)
+                        : resolve(),
+                );
+                server.closeAllConnections();
+            });
         },
     };
 }

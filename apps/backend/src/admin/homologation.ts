@@ -1,4 +1,5 @@
-import { mkdtempSync, chmodSync, rmSync } from 'node:fs';
+import { protectTemporaryDirectory } from '../private-files.ts';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
@@ -119,7 +120,12 @@ export async function startAdministrationHomologation(options: {
     const assets = loadAdministrationAssets();
     const arenaAssets = loadHomologationArena();
     const directory = mkdtempSync(join(tmpdir(), 'duelo-admin-homologation-'));
-    chmodSync(directory, 0o700);
+    try {
+        protectTemporaryDirectory(directory);
+    } catch (error) {
+        rmSync(directory, { recursive: true, force: true });
+        throw error;
+    }
     const filename = join(directory, 'homologation.sqlite');
     let publicServer: Server | undefined;
     let admin: ReturnType<typeof createAdministrationServer> | undefined;
@@ -138,17 +144,14 @@ export async function startAdministrationHomologation(options: {
         runtime = undefined;
         publicServer = undefined;
         // Clear sessions and finish HTTP writes before closing the SQLite authority.
-        const administrationClosed = a
-            ? new Promise<void>((resolve) => {
-                  a.server.once('close', resolve);
-                  a.close();
-              })
-            : Promise.resolve();
-        await administrationClosed;
         try {
-            await r?.close();
+            await a?.close();
         } finally {
-            if (s) await closeServer(s);
+            try {
+                await r?.close();
+            } finally {
+                if (s) await closeServer(s);
+            }
         }
     }
     async function start(action: 'create' | 'resume') {

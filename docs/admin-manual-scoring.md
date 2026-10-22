@@ -109,3 +109,7 @@ Conector TikTok, aliases 13/22, catálogo híbrido e arena permanecem compatíve
 ## Homologação sem ambiente operacional
 
 O comando `npm run homologate:admin -- --isolated --credential /caminho/credencial-de-teste.json` reutiliza este painel e o runtime existentes com provedor sintético, catálogo fictício e banco SQLite temporário exclusivo. Não exige nem lê o `.env` operacional. Prepare os bundles com `npm run build:homologation` e siga [o procedimento de homologação](admin-homologation.md), incluindo recuperação por `r`, invalidação de sessões e limpeza por Ctrl+C. Este fluxo não altera os requisitos ou a configuração de ativação da administração operacional descritos acima.
+
+## Credenciais no Windows
+
+Use a mesma CLI, com caminho absoluto nativo e arquivo externo novo. A leitura exige DACL protegida do usuário atual (SYSTEM explícito opcional), sem confiar em `chmod 0600` emulado. Nenhuma ACL de arquivo existente é alterada automaticamente. Procedimento isolado, limites e validação nativa pendente em [windows-compatibility.md](windows-compatibility.md).

@@ -1,3 +1,4 @@
+import { defer, track } from './helpers/resources.ts';
 import { spawnSync } from 'node:child_process';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -108,7 +109,7 @@ function observe() {
 }
 function temporary(t: TestContext) {
     const path = mkdtempSync(join(tmpdir(), 'duelo-phase56-'));
-    t.after(() => rmSync(path, { recursive: true, force: true }));
+    defer(t, () => rmSync(path, { recursive: true, force: true }));
     return path;
 }
 
@@ -502,11 +503,14 @@ test('5.6: combo acumulativo por nome, retransmissão, rollback e SQLite recuper
         ...baseReviews(),
         review('5576', 'cumulative-final'),
     ]);
-    let storage = openSqliteScoring({
-        filename,
-        mode: 'create',
-        engine: settings(active),
-    });
+    let storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'create',
+            engine: settings(active),
+        }),
+    );
     const admit = (msg: string, count: number, final: number, id = '99999') => {
         const result = validateRealOccurrence(
             'gift',
@@ -522,13 +526,16 @@ test('5.6: combo acumulativo por nome, retransmissão, rollback e SQLite recuper
     storage.process(admit('2002', 2, 0, '99998'));
     const pending = storage.snapshot();
     storage.close();
-    storage = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: settings(active),
-    });
+    storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: settings(active),
+        }),
+    );
     assert.deepEqual(storage.snapshot(), pending);
-    const db = new Database(filename);
+    const db = track(t, new Database(filename));
     db.exec(
         "CREATE TRIGGER phase56_fail BEFORE UPDATE ON dispute BEGIN SELECT RAISE(ABORT,'synthetic failure'); END",
     );
@@ -540,21 +547,27 @@ test('5.6: combo acumulativo por nome, retransmissão, rollback e SQLite recuper
     assert.equal(storage.process(final).points, 60);
     assert.equal(storage.process(final).status, 'duplicate');
     storage.close();
-    storage = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: settings(active),
-    });
+    storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: settings(active),
+        }),
+    );
     assert.equal(storage.snapshot().scores.lula, 60);
     assert.equal(storage.process(final).status, 'duplicate');
     storage.close();
     assert.throws(
         () =>
-            openSqliteScoring({
-                filename,
-                mode: 'resume',
-                engine: settings(baseline()),
-            }),
+            track(
+                t,
+                openSqliteScoring({
+                    filename,
+                    mode: 'resume',
+                    engine: settings(baseline()),
+                }),
+            ),
         /context/,
     );
 });
@@ -602,11 +615,14 @@ test('5.6: painel autenticado lista só cinco regras revistas; servidor calcula,
         ...baseReviews(),
         review('5576'),
     ]);
-    let storage = openSqliteScoring({
-        filename,
-        mode: 'create',
-        engine: settings(active),
-    });
+    let storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'create',
+            engine: settings(active),
+        }),
+    );
     let published = 0;
     const service = createAdministrationService(storage, {
         roomId: ROOM,
@@ -631,8 +647,8 @@ test('5.6: painel autenticado lista só cinco regras revistas; servidor calcula,
     const address = server.server.address();
     assert.ok(address && typeof address !== 'string');
     const origin = `http://127.0.0.2:${address.port}`;
-    t.after(() => {
-        server.close();
+    defer(t, async () => {
+        await server.close();
         storage.close();
     });
     const headers = {
@@ -713,11 +729,14 @@ test('5.6: painel autenticado lista só cinco regras revistas; servidor calcula,
     assert.equal(view.history.length, 3);
     const expected = storage.administrationView();
     storage.close();
-    storage = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: settings(active),
-    });
+    storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: settings(active),
+        }),
+    );
     assert.deepEqual(storage.administrationView(), expected);
 });
 

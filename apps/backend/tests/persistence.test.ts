@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { spawn, spawnSync } from 'node:child_process';
@@ -507,15 +508,21 @@ test('morte de processo durante transação não comitada não altera estado rec
     const code = `const Database = require(${JSON.stringify(createRequire(import.meta.url).resolve('better-sqlite3'))});
         const db = new Database(${JSON.stringify(f.filename)});
         db.exec('BEGIN IMMEDIATE; UPDATE dispute SET lula = 999');
-        process.kill(process.pid, 'SIGKILL');`;
+        process.stdout.write('TRANSACTION_OPEN', () => process.kill(process.pid, 'SIGKILL'));`;
     const child = spawnSync(process.execPath, ['-e', code]);
-    assert.equal(child.signal, 'SIGKILL');
+    assert.equal(child.stdout.toString(), 'TRANSACTION_OPEN');
+    if (process.platform === 'win32') assert.notEqual(child.status, 0);
+    else assert.equal(child.signal, 'SIGKILL');
     assert.deepEqual(f.open('resume').snapshot(), expected);
 });
 
 test('caminho padrão é externo ao repositório e caminhos de build/fonte são recusados', (t) => {
     const f = fixture(t);
-    assert.ok(defaultScoringDatabasePath().endsWith('duelo-3d/scoring.sqlite'));
+    assert.ok(
+        defaultScoringDatabasePath().endsWith(
+            join('duelo-3d', 'scoring.sqlite'),
+        ),
+    );
     assert.throws(
         () =>
             openSqliteScoring({
@@ -525,8 +532,9 @@ test('caminho padrão é externo ao repositório e caminhos de build/fonte são 
             }),
         /absolute/,
     );
-    const inside = new URL('../dist/forbidden.sqlite', import.meta.url)
-        .pathname;
+    const inside = fileURLToPath(
+        new URL('../dist/forbidden.sqlite', import.meta.url),
+    );
     assert.throws(
         () =>
             openSqliteScoring({
@@ -544,7 +552,25 @@ test('remoção do arquivo de uma conexão ativa bloqueia novas operações', (t
     const f = fixture(t);
     const engine = f.open('create');
     engine.process(comment());
-    rmSync(f.filename);
+    const before = engine.snapshot();
+    try {
+        rmSync(f.filename);
+    } catch (error) {
+        // Windows can deny unlink while SQLite owns the handle. That is protection,
+        // not a failed corruption test: prove identity/state remain usable and intact.
+        assert.equal(process.platform, 'win32');
+        assert.ok(
+            ['EPERM', 'EACCES', 'EBUSY'].includes(
+                (error as NodeJS.ErrnoException).code!,
+            ),
+        );
+        assert.deepEqual(engine.snapshot(), before);
+        assert.equal(engine.process(comment()).status, 'duplicate');
+        engine.close();
+        rmSync(f.filename); // Must be removable once every connection is closed.
+        assert.throws(() => f.open('resume'));
+        return;
+    }
     assert.throws(() => engine.process(comment('new')), /removed or replaced/);
     assert.throws(() => engine.snapshot(), /blocked/);
 });

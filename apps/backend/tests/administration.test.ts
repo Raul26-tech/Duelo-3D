@@ -1,3 +1,7 @@
+import { fileURLToPath } from 'node:url';
+import { writeNewLocalJson } from '../src/local-json.ts';
+import { makePublicFixture } from './helpers/platform.ts';
+import { defer, track } from './helpers/resources.ts';
 import { request as httpRequest } from 'node:http';
 import {
     SCHEMA,
@@ -7,13 +11,7 @@ import {
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import {
-    mkdtempSync,
-    rmSync,
-    writeFileSync,
-    chmodSync,
-    readFileSync,
-} from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once, EventEmitter } from 'node:events';
@@ -123,7 +121,7 @@ const localFetch = (url: string, init: RequestInit = {}): Promise<Response> =>
 const reason = 'Reconciliação sintética documentada pelo operador';
 function temp(t: TestContext) {
     const dir = mkdtempSync(join(tmpdir(), 'duelo-admin-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    defer(t, () => rmSync(dir, { recursive: true, force: true }));
     return dir;
 }
 function award(sessionId: string, extra: Record<string, unknown> = {}) {
@@ -142,17 +140,20 @@ function award(sessionId: string, extra: Record<string, unknown> = {}) {
 }
 function rig(t: TestContext, overrides: Partial<typeof engine> = {}) {
     const filename = join(temp(t), 'score.sqlite');
-    let storage = openSqliteScoring({
-        filename,
-        mode: 'create',
-        engine: { ...engine, ...overrides },
-    });
+    let storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'create',
+            engine: { ...engine, ...overrides },
+        }),
+    );
     let service = createAdministrationService(storage, {
         roomId: ROOM,
         assertAuthority() {},
         publish() {},
     });
-    t.after(() => storage.close());
+    defer(t, () => storage.close());
     return {
         filename,
         get storage() {
@@ -163,11 +164,14 @@ function rig(t: TestContext, overrides: Partial<typeof engine> = {}) {
         },
         restart() {
             storage.close();
-            storage = openSqliteScoring({
-                filename,
-                mode: 'resume',
-                engine: { ...engine, ...overrides },
-            });
+            storage = track(
+                t,
+                openSqliteScoring({
+                    filename,
+                    mode: 'resume',
+                    engine: { ...engine, ...overrides },
+                }),
+            );
             service = createAdministrationService(storage, {
                 roomId: ROOM,
                 assertAuthority() {},
@@ -193,7 +197,7 @@ test('admin: catálogo autoritativo, justificativa, operador, data, versão e hi
         request = award(r.storage.snapshot().sessionId);
     assert.equal(r.service.execute('operador', 'award', request).points, 26);
     assert.equal(r.storage.snapshot().scores.lula, 26);
-    const db = new Database(r.filename);
+    const db = track(t, new Database(r.filename));
     assert.equal(
         JSON.parse(
             (
@@ -309,7 +313,7 @@ test('admin: overflow não grava identidade, auditoria ou placar parcial', (t) =
     );
     assert.equal(r.service.view().operations.length, 0);
     assert.equal(r.storage.snapshot().version, 0);
-    const sql = new Database(r.filename);
+    const sql = track(t, new Database(r.filename));
     assert.equal(
         (sql.prepare('SELECT count(*) n FROM journal').get() as { n: number })
             .n,
@@ -375,7 +379,7 @@ test('admin: transação falha faz rollback de pontuação, identidade e histór
     const r = rig(t),
         request = award(r.storage.snapshot().sessionId);
     const before = r.storage.snapshot();
-    const db = new Database(r.filename);
+    const db = track(t, new Database(r.filename));
     db.exec(
         "CREATE TRIGGER fail_admin BEFORE UPDATE ON dispute BEGIN SELECT RAISE(ABORT, 'synthetic transaction'); END",
     );
@@ -571,7 +575,7 @@ test('admin: adulteração de auditoria ou estado bloqueia recuperação sem zer
         award(r.storage.snapshot().sessionId),
     );
     r.storage.close();
-    const db = new Database(r.filename);
+    const db = track(t, new Database(r.filename));
     db.exec(
         "UPDATE journal SET event_json=replace(event_json, 'Reconciliação', 'Adulteração')",
     );
@@ -585,7 +589,7 @@ test('credenciais: hash nativo, arquivo externo privado, senha não armazenada e
     assert.throws(() => makeCredential('operador', 'short'));
     assert.throws(() => makeCredential('<script>', 'long-synthetic-password'));
     const path = join(temp(t), 'credential.json');
-    writeFileSync(path, JSON.stringify(credential), { mode: 0o600 });
+    writeNewLocalJson(path, credential);
     assert.deepEqual(readCredential(path), credential);
     assert.ok(!readFileSync(path, 'utf8').includes('synthetic-password'));
     assert.equal(
@@ -608,7 +612,7 @@ test('credenciais: hash nativo, arquivo externo privado, senha não armazenada e
         await verifyCredential(credential, 'operador', 'invalid'),
         false,
     );
-    chmodSync(path, 0o644);
+    makePublicFixture(path);
     assert.throws(() => readCredential(path));
 });
 async function httpRig(t: TestContext, clock?: () => number) {
@@ -638,7 +642,7 @@ async function httpRig(t: TestContext, clock?: () => number) {
     const address = admin.server.address();
     assert.ok(address && typeof address !== 'string');
     const origin = `http://127.0.0.2:${address.port}`;
-    t.after(() => admin.close());
+    defer(t, () => admin.close());
     let cookie = '',
         csrf = '';
     const request = (
@@ -791,7 +795,7 @@ test('HTTP: falhas SQL são sanitizadas, corpo limitado e campos desconhecidos n
     const r = await httpRig(t);
     await r.login();
     const view = await json(await r.request('state'));
-    const db = new Database(r.filename);
+    const db = track(t, new Database(r.filename));
     db.exec(
         "CREATE TRIGGER fail_admin BEFORE UPDATE ON dispute BEGIN SELECT RAISE(ABORT, 'private-sql-detail'); END",
     );
@@ -837,7 +841,7 @@ test('runtime: administração publica após commit, retry não publica, arena r
         factory: () => new Provider(),
         afterCommit(decision) {
             if (decision.status !== 'applied') return;
-            const db = new Database(filename);
+            const db = track(t, new Database(filename));
             assert.equal(
                 (
                     db.prepare('SELECT version FROM dispute').get() as {
@@ -894,8 +898,8 @@ test('runtime: administração publica após commit, retry não publica, arena r
             body: JSON.stringify(body),
         });
     const viewers: WebSocket[] = [];
-    t.after(async () => {
-        admin.close();
+    defer(t, async () => {
+        await admin.close();
         viewers.forEach((ws) => ws.terminate());
         await runtime.close();
         await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -954,7 +958,7 @@ test('legado v2 fixo: administração estende journal sem migrar schema, preserv
         ),
     );
     const filename = join(temp(t), 'historical.sqlite');
-    const db = new Database(filename);
+    const db = track(t, new Database(filename));
     db.pragma('journal_mode=WAL');
     db.pragma('foreign_keys=ON');
     db.exec(SCHEMA);
@@ -1008,11 +1012,14 @@ test('legado v2 fixo: administração estende journal sem migrar schema, preserv
     const oldRows = db
         .prepare('SELECT event_json FROM journal ORDER BY position')
         .all();
-    let storage = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: fixture.options,
-    });
+    let storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: fixture.options,
+        }),
+    );
     assert.deepEqual(storage.snapshot(), state);
     const service = createAdministrationService(storage, {
         roomId: cfg.roomId,
@@ -1022,11 +1029,14 @@ test('legado v2 fixo: administração estende journal sem migrar schema, preserv
     const request = award(state.sessionId);
     assert.equal(service.execute('operador', 'award', request).points, 26);
     storage.close();
-    storage = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: fixture.options,
-    });
+    storage = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: fixture.options,
+        }),
+    );
     try {
         assert.equal(storage.snapshot().scores.lula, 26);
         assert.equal(storage.administrationView().operations.length, 1);
@@ -1078,20 +1088,26 @@ test('catálogo aprovado não é alterado pela administração; retomada incompa
     r.storage.close();
     assert.throws(
         () =>
-            openSqliteScoring({
-                filename: r.filename,
-                mode: 'resume',
-                engine: { ...engine, catalog: [] },
-            }),
+            track(
+                t,
+                openSqliteScoring({
+                    filename: r.filename,
+                    mode: 'resume',
+                    engine: { ...engine, catalog: [] },
+                }),
+            ),
         /context/,
     );
     assert.throws(
         () =>
-            openSqliteScoring({
-                filename: r.filename,
-                mode: 'resume',
-                engine: { ...engine, sourcePolicy: 'different' },
-            }),
+            track(
+                t,
+                openSqliteScoring({
+                    filename: r.filename,
+                    mode: 'resume',
+                    engine: { ...engine, sourcePolicy: 'different' },
+                }),
+            ),
         /context/,
     );
 });
@@ -1103,8 +1119,9 @@ test('CLI de credencial usa stdin sem eco, cria arquivo novo e nunca imprime sen
         spawnSync(
             process.execPath,
             [
-                new URL('../src/admin/credential-cli.ts', import.meta.url)
-                    .pathname,
+                fileURLToPath(
+                    new URL('../src/admin/credential-cli.ts', import.meta.url),
+                ),
                 '--operator',
                 'operador',
                 '--output',

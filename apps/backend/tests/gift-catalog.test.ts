@@ -1,3 +1,5 @@
+import { assertPrivateFile } from '../src/private-files.ts';
+import { defer, track } from './helpers/resources.ts';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -5,7 +7,6 @@ import {
     rmSync,
     readFileSync,
     writeFileSync,
-    statSync,
     symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -76,7 +77,7 @@ function approved(
 }
 function temporary(t: TestContext) {
     const dir = mkdtempSync(join(tmpdir(), 'duelo-gifts-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    defer(t, () => rmSync(dir, { recursive: true, force: true }));
     return dir;
 }
 const payload = (
@@ -385,22 +386,28 @@ test('SQLite recupera combo pendente e rejeita mudança silenciosa de catálogo;
     const active = prepareActive(reference, [
         approved('5655', 'cumulative-final'),
     ]);
-    let store = openSqliteScoring({
-        filename,
-        mode: 'create',
-        engine: settings(active),
-    });
+    let store = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'create',
+            engine: settings(active),
+        }),
+    );
     store.process(event(active, payload('5655', '1301', 1, 0, true)));
     const before = store.snapshot();
     store.close();
-    store = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: settings(active),
-    });
+    store = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: settings(active),
+        }),
+    );
     try {
         assert.deepEqual(store.snapshot(), before);
-        const sql = new Database(filename);
+        const sql = track(t, new Database(filename));
         sql.exec(
             "CREATE TRIGGER fail_score BEFORE UPDATE ON dispute BEGIN SELECT RAISE(ABORT, 'synthetic'); END",
         );
@@ -413,11 +420,14 @@ test('SQLite recupera combo pendente e rejeita mudança silenciosa de catálogo;
     } finally {
         store.close();
     }
-    store = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: settings(active),
-    });
+    store = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: settings(active),
+        }),
+    );
     assert.equal(
         store.process(event(active, payload('5655', '1302', 10, 1, true)))
             .status,
@@ -426,11 +436,14 @@ test('SQLite recupera combo pendente e rejeita mudança silenciosa de catálogo;
     store.close();
     assert.throws(
         () =>
-            openSqliteScoring({
-                filename,
-                mode: 'resume',
-                engine: settings(prepareActive(reference, [])),
-            }),
+            track(
+                t,
+                openSqliteScoring({
+                    filename,
+                    mode: 'resume',
+                    engine: settings(prepareActive(reference, [])),
+                }),
+            ),
         /context/,
     );
 });
@@ -438,7 +451,7 @@ test('arquivos novos somente: não sobrescreve catálogo ativo, nem grava no rep
     const dir = temporary(t);
     const active = join(dir, 'active.json');
     writeNewLocalJson(active, []);
-    assert.equal(statSync(active).mode & 0o777, 0o600);
+    assertPrivateFile(active);
     assert.throws(() => writeNewLocalJson(active, [{ points: 999 }]));
     assert.deepEqual(readLocalJson(active), []);
     const repo = fileURLToPath(new URL('../../../', import.meta.url));
@@ -446,10 +459,14 @@ test('arquivos novos somente: não sobrescreve catálogo ativo, nem grava no rep
         () => writeNewLocalJson(join(repo, 'would-write.json'), []),
         /outside/,
     );
-    symlinkSync(repo, join(dir, 'repo-link'), 'dir');
+    symlinkSync(
+        repo,
+        join(dir, 'repo-link'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+    );
     assert.throws(
         () => writeNewLocalJson(join(dir, 'repo-link', 'would-write.json'), []),
-        /outside/,
+        /outside|Symlink|reparse/,
     );
     assert.throws(() => writeNewLocalJson('relative.json', []));
     const oversized = join(dir, 'large.json');

@@ -1,8 +1,8 @@
+import { assertPrivateFile, readPrivateFile } from '../private-files.ts';
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
 import { statSync, realpathSync } from 'node:fs';
 import { relative, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readLocalJson } from '../local-json.ts';
 import { record, exact } from '../scoring/validation.ts';
 export type Credential = Readonly<{
     version: 1;
@@ -29,6 +29,7 @@ export function makeCredential(operator: string, password: string): Credential {
     });
 }
 export function readCredential(path: string): Credential {
+    assertPrivateFile(path);
     const resolved = realpathSync(path);
     const repository = fileURLToPath(new URL('../../../../', import.meta.url));
     const child = relative(repository, resolved);
@@ -40,13 +41,18 @@ export function readCredential(path: string): Credential {
             child !== '..' &&
             !isAbsolute(child)) ||
         !stat.isFile() ||
-        stat.size > 4096 ||
-        (stat.mode & 0o077) !== 0
+        stat.size > 4096
     )
         throw new Error(
-            'Credencial deve estar fora do projeto, em arquivo privado 0600',
+            'Credencial deve estar fora do projeto, em arquivo privado (0600 no Unix; ACL restrita no Windows)',
         );
-    const value = readLocalJson(resolved);
+    const data = readPrivateFile(path, 4096);
+    let value: unknown;
+    try {
+        value = JSON.parse(data.toString('utf8'));
+    } catch {
+        throw new Error('Credencial inválida');
+    }
     if (
         !record(value) ||
         !exact(value, ['version', 'operator', 'salt', 'hash']) ||

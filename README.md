@@ -141,3 +141,7 @@ Nenhuma autorização automática, conexão real, alteração de `.env`, prepara
 `catalog:gifts experiment-template`, `experiment-status`, `experiment-prepare` e `experiment-verify` preparam um manifesto experimental dos 14 presentes. Exigem as quatro regras privadas existentes e escolha/justificativa/aceite do operador para as dez entregas pendentes; não simulam validação real. O manifesto exige opt-in separado, não é catálogo validado e não pode retomar silenciosamente bancos de outro contexto.
 
 O relatório opt-in do próprio runtime usa a mesma conexão, com prazo até 35 minutos e volume limitado; não muda pontos e pode ser avaliado por `catalog:gifts assess`. Preparação offline, bloqueios individuais, riscos, observação posterior e reconciliação administrativa: [docs/gift-experimental-homologation.md](docs/gift-experimental-homologation.md). A disputa nova e a preparação da transmissão ficam fora desta entrega.
+
+## Windows 10
+
+Correções de caminhos, fechamento de recursos e credenciais com ACL estão descritas em [docs/windows-compatibility.md](docs/windows-compatibility.md), junto ao roteiro para validar em worktree limpo no notebook da Carine. No Windows, `0600` emulado não é aceito como prova de privacidade: a CLI cria DACL restrita com Windows PowerShell 5.1. A validação nativa Windows continua pendente; aprovação no Linux não a substitui.

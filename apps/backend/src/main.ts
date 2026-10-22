@@ -147,14 +147,20 @@ let stopping = false;
 async function stop() {
     if (stopping) return;
     stopping = true;
-    administration?.close();
-    await realtime?.close();
-    server.close((error) => {
-        if (error) {
-            console.error(error.message);
-            process.exitCode = 1;
+    try {
+        await administration?.close();
+    } finally {
+        try {
+            await realtime?.close();
+        } finally {
+            server.close((error) => {
+                if (error) {
+                    console.error(error.message);
+                    process.exitCode = 1;
+                }
+            });
         }
-    });
+    }
 }
 process.on('SIGINT', () => void stop());
 process.on('SIGTERM', () => void stop());
