@@ -12,7 +12,9 @@
         "start": "node dist/main.js",
         "test": "node --test tests/*.test.ts",
         "diagnose:tiktok": "node src/tiktok/main.ts",
-        "catalog:gifts": "node src/catalog-tools/main.ts"
+        "catalog:gifts": "node src/catalog-tools/main.ts",
+        "admin:credential": "node src/admin/credential-cli.ts",
+        "homologate:admin": "node src/admin/homologation-cli.ts"
     },
     "devDependencies": {
         "@types/better-sqlite3": "9.6.0",

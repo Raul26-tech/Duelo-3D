@@ -1,3 +1,4 @@
+import { createAdministrationService } from '../admin/service.ts';
 import type { Server } from 'node:http';
 import { openSqliteScoring } from '../persistence/sqlite.ts';
 import type { Decision } from '../scoring/contracts.ts';
@@ -110,6 +111,22 @@ export function startRealRuntime(options: {
             /* Diagnostic output must not turn a committed event into a retry. */
         }
     }
+    const administration = createAdministrationService(storage, {
+        roomId: config.roomId,
+        assertAuthority() {
+            if (blocked) throw new Error('Real processing blocked');
+            lease.assertHeld();
+        },
+        publish(decision) {
+            try {
+                options.afterCommit?.(decision);
+                arena.publish(decision);
+            } catch {
+                report('PUBLICATION_FAILED');
+                arena.disconnectViewers();
+            }
+        },
+    });
     const client = createDiagnosticClient({
         enabled: true,
         factory: options.factory,
@@ -177,6 +194,7 @@ export function startRealRuntime(options: {
     let closing: Promise<void> | undefined;
     return {
         snapshot,
+        administration,
         state: client.state,
         close() {
             if (!closing)

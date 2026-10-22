@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Duelo 3D — Acesso administrativo</title>
+    </head>
+    <body>
+        <header>
+            <div class="brand">DUELO <span>3D</span></div>
+            <p>Administração local</p>
+        </header>
+        <main>
+            <section class="card narrow">
+                <h1>Acesso do operador</h1>
+                <p>Autentique-se com a credencial privada deste ambiente.</p>
+                <form id="login-form">
+                    <label
+                        >Operador<input
+                            id="operator"
+                            autocomplete="username"
+                            required
+                            maxlength="64" /></label
+                    ><label
+                        >Senha<input
+                            id="password"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                            maxlength="1024" /></label
+                    ><button id="submit">Entrar</button>
+                </form>
+                <p id="message" role="status" aria-live="polite"></p>
+            </section>
+            <footer>
+                Enquete informal de entretenimento. Não representa pesquisa
+                eleitoral ou votação oficial.
+            </footer>
+        </main>
+        <script type="module" src="./login.ts"></script>
+    </body>
+</html>

@@ -8,6 +8,19 @@ if (!['simulation', 'observation', 'real'].includes(mode))
     throw new Error('Invalid DUEL_MODE');
 if (mode !== 'real' && process.env.TIKTOK_REAL_ENABLED === 'true')
     throw new Error('Real scoring requires DUEL_MODE=real');
+let adminConfig: ReturnType<
+    typeof import('./admin/server.ts').readAdministrationConfig
+> = null;
+if (
+    process.env.ADMIN_ENABLED !== undefined &&
+    process.env.ADMIN_ENABLED !== 'false'
+) {
+    const { readAdministrationConfig } = await import('./admin/server.ts');
+    adminConfig = readAdministrationConfig();
+}
+let administration:
+    | ReturnType<typeof import('./admin/server.ts').createAdministrationServer>
+    | undefined;
 const server = createBackendServer(
     mode as 'simulation' | 'observation' | 'real',
 );
@@ -50,13 +63,43 @@ if (mode === 'real' || mode === 'observation') {
         });
         const { resolvePort } = await import('./server.ts');
         const frontendPort = resolvePort(process.env.FRONTEND_PORT ?? '5173');
-        realtime = startRealRuntime({
+        if (
+            adminConfig &&
+            (adminConfig.port === port || adminConfig.port === frontendPort)
+        )
+            throw new Error('ADMIN_PORT deve ser distinta das portas públicas');
+        const runtime = startRealRuntime({
             server,
             origin: `http://127.0.0.1:${frontendPort}`,
             config,
             factory,
             writeDiagnostic: write,
         });
+        realtime = runtime;
+        if (adminConfig) {
+            const {
+                createAdministrationServer,
+                loadAdministrationAssets,
+                ADMIN_HOST,
+            } = await import('./admin/server.ts');
+            let assets: ReturnType<typeof loadAdministrationAssets> | undefined;
+            administration = createAdministrationServer({
+                credential: adminConfig.credential,
+                service: runtime.administration,
+                gifts: config.gifts,
+                connection: runtime.state,
+                assets: () => (assets ??= loadAdministrationAssets()),
+            });
+            administration.server.on('error', () => {
+                process.exitCode = 1;
+                void stop();
+            });
+            administration.server.listen(adminConfig.port, ADMIN_HOST, () =>
+                console.log(
+                    `Administração local: http://${ADMIN_HOST}:${adminConfig.port}/admin/`,
+                ),
+            );
+        }
         console.log(
             'REAL: arena somente leitura; fonte TikTok e disputa persistida vinculadas.',
         );
@@ -95,6 +138,7 @@ let stopping = false;
 async function stop() {
     if (stopping) return;
     stopping = true;
+    administration?.close();
     await realtime?.close();
     server.close((error) => {
         if (error) {

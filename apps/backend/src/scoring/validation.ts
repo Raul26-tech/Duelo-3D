@@ -1,3 +1,4 @@
+import { parseAdminEvent, isAdminEvent } from './administration.ts';
 import type { ScoringEvent } from './contracts.ts';
 
 export function record(value: unknown): value is Record<string, unknown> {
@@ -35,6 +36,11 @@ export function parseEvent(value: unknown): ScoringEvent | null {
             value.domain !== 'real')
     )
         return null;
+    if (
+        typeof value.type === 'string' &&
+        isAdminEvent(value as { type: string })
+    )
+        return parseAdminEvent(value);
     const common = ['origin', 'roomId', 'domain', 'eventId', 'type'];
     const actorId = value.domain === 'real' ? normalizeId(value.actorId) : null;
     if (value.domain === 'real') {
@@ -140,7 +146,20 @@ export function parseEvent(value: unknown): ScoringEvent | null {
     };
 }
 
-export function eventIdentity(event: ScoringEvent): string {
+export function eventIdentity(
+    event: Pick<
+        ScoringEvent,
+        'origin' | 'roomId' | 'domain' | 'type' | 'eventId'
+    >,
+): string {
+    if (isAdminEvent(event))
+        return JSON.stringify([
+            event.origin,
+            event.roomId,
+            event.domain,
+            'admin.operation',
+            event.eventId,
+        ]);
     return JSON.stringify([
         event.origin,
         event.roomId,
@@ -152,6 +171,10 @@ export function eventIdentity(event: ScoringEvent): string {
 
 /** Stable order independent of caller property order, including normalized IDs. */
 export function fingerprint(event: ScoringEvent): string {
+    if (isAdminEvent(event)) {
+        const { appliedPoints: _points, ...command } = event;
+        return JSON.stringify(command);
+    }
     return JSON.stringify(
         event.type === 'comment'
             ? [

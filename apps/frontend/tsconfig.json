@@ -11,5 +11,12 @@
         "erasableSyntaxOnly": true,
         "types": ["node"]
     },
-    "include": ["src", "tests", "vite.config.ts"]
+    "include": [
+        "src",
+        "tests",
+        "vite.config.ts",
+        "admin",
+        "vite.admin.config.ts",
+        "vite.homologation.config.ts"
+    ]
 }

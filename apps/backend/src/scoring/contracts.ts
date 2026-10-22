@@ -31,7 +31,8 @@ export type GiftEvent = Identity &
         giftRuleId?: string | null;
         delivery: GiftDelivery;
     }>;
-export type ScoringEvent = CommentEvent | GiftEvent;
+export type ScoringEvent =
+    CommentEvent | GiftEvent | import('./administration.ts').AdminEvent;
 export type GiftRule = Readonly<{
     giftId: string;
     name: string;

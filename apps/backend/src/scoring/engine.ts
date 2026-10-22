@@ -1,3 +1,10 @@
+import {
+    ADMIN_ORIGIN,
+    isAdminEvent,
+    type AuditOperation,
+    type AdminEvent,
+    type SourceLink,
+} from './administration.ts';
 import { randomUUID } from 'node:crypto';
 import type {
     Candidate,
@@ -78,6 +85,170 @@ export function createScoringEngine(
     let scores = { lula: 0, flavio: 0 };
     const events = new Map<string, string>();
     const sequences = new Map<string, Sequence>();
+    const operations = new Map<string, AuditOperation>();
+    const claims = new Map<string, string>();
+    const linkKeys = (link: SourceLink) => [
+        JSON.stringify(['event', link.eventId]),
+        ...(link.sequenceId
+            ? [JSON.stringify(['sequence', link.actorId, link.sequenceId])]
+            : []),
+    ];
+    function administer(
+        event: AdminEvent,
+        identity: string,
+        content: string,
+    ): Decision {
+        if (event.sessionId !== sessionId)
+            return result('rejected', 'SESSION_MISMATCH', identity);
+        const prior = events.get(identity);
+        if (prior !== undefined)
+            return result(
+                prior === content ? 'duplicate' : 'rejected',
+                prior === content
+                    ? 'EVENT_ALREADY_PROCESSED'
+                    : 'IDENTITY_CONFLICT',
+                identity,
+            );
+        if (events.size + sequences.size + 1 > capacity)
+            return result('rejected', 'CAPACITY_REACHED', identity);
+        let candidate: Candidate,
+            points: number,
+            ruleId: string,
+            quantity: number,
+            link: SourceLink | null,
+            reference: string | null;
+        if (event.type === 'admin.award') {
+            const rule = catalog.get(event.ruleId);
+            if (!rule || rule.candidate !== event.candidate)
+                return result('rejected', 'UNAUTHORIZED_RULE', identity);
+            const original = event.correctionOf
+                ? operations.get(event.correctionOf)
+                : undefined;
+            if (
+                event.correctionOf &&
+                (!original ||
+                    original.type !== 'admin.award' ||
+                    original.state !== 'reversed' ||
+                    [...operations.values()].some(
+                        (op) =>
+                            op.type === 'admin.award' &&
+                            op.reference === event.correctionOf,
+                    ))
+            )
+                return result('rejected', 'INVALID_CORRECTION', identity);
+            if (event.link) {
+                const sourceIdentity = JSON.stringify([
+                    origin,
+                    roomId,
+                    domain,
+                    'gift',
+                    event.link.eventId,
+                ]);
+                const oldSequence = JSON.stringify([
+                    origin,
+                    roomId,
+                    domain,
+                    event.link.sequenceId,
+                ]);
+                const newSequence = JSON.stringify([
+                    origin,
+                    roomId,
+                    domain,
+                    event.link.sequenceId,
+                    event.link.actorId,
+                ]);
+                if (
+                    events.has(sourceIdentity) ||
+                    (event.link.sequenceId &&
+                        (sequences.has(oldSequence) ||
+                            sequences.has(newSequence)))
+                )
+                    return result(
+                        'rejected',
+                        'SOURCE_ALREADY_RECORDED',
+                        identity,
+                    );
+                if (
+                    linkKeys(event.link).some(
+                        (key) =>
+                            claims.has(key) &&
+                            claims.get(key) !== event.correctionOf,
+                    )
+                )
+                    return result(
+                        'rejected',
+                        'SOURCE_ALREADY_CLAIMED',
+                        identity,
+                    );
+            }
+            candidate = rule.candidate;
+            points = rule.points * event.quantity;
+            ruleId = event.ruleId;
+            quantity = event.quantity;
+            link = event.link;
+            reference = event.correctionOf;
+        } else {
+            const original = operations.get(event.targetOperationId);
+            if (!original || original.type !== 'admin.award')
+                return result('rejected', 'OPERATION_NOT_FOUND', identity);
+            if (original.state === 'reversed')
+                return result('rejected', 'ALREADY_REVERSED', identity);
+            candidate = original.candidate;
+            points = -original.points;
+            ruleId = original.ruleId;
+            quantity = original.quantity;
+            link = original.link;
+            reference = original.operationId;
+        }
+        if (
+            !Number.isSafeInteger(points) ||
+            !Number.isSafeInteger(scores[candidate] + points) ||
+            scores[candidate] + points < 0 ||
+            !Number.isSafeInteger(scores.lula + scores.flavio + points) ||
+            !Number.isSafeInteger(version + 1)
+        )
+            return result('rejected', 'SCORE_LIMIT', identity);
+        if (event.appliedPoints !== undefined && event.appliedPoints !== points)
+            return result('rejected', 'INVALID_AUDIT_POINTS', identity);
+        events.set(identity, content);
+        scores = { ...scores, [candidate]: scores[candidate] + points };
+        version++;
+        if (event.type === 'admin.reversal')
+            operations.set(
+                reference!,
+                Object.freeze({
+                    ...operations.get(reference!)!,
+                    state: 'reversed',
+                }),
+            );
+        if (event.type === 'admin.award' && link)
+            for (const key of linkKeys(link)) claims.set(key, event.eventId);
+        operations.set(
+            event.eventId,
+            Object.freeze({
+                operationId: event.eventId,
+                operatorId: event.actorId!,
+                at: event.at,
+                type: event.type,
+                candidate,
+                ruleId,
+                quantity,
+                points,
+                justification: event.justification,
+                reference,
+                link: link ? Object.freeze({ ...link }) : null,
+                state: 'applied',
+                version,
+            }),
+        );
+        return result(
+            'applied',
+            event.type === 'admin.award' ? 'ADMIN_AWARDED' : 'ADMIN_REVERSED',
+            identity,
+            candidate,
+            points,
+        );
+    }
     const snapshot = (): Snapshot =>
         Object.freeze({
             sessionId,
@@ -116,12 +287,15 @@ export function createScoringEngine(
         if (!event) return result('rejected', 'INVALID_EVENT');
         if (
             event.domain !== domain ||
-            event.origin !== origin ||
+            (isAdminEvent(event)
+                ? event.origin !== ADMIN_ORIGIN || domain !== 'real'
+                : event.origin !== origin) ||
             event.roomId !== roomId
         )
             return result('rejected', 'UNAUTHORIZED_CONTEXT');
         const identity = eventIdentity(event);
         const content = fingerprint(event);
+        if (isAdminEvent(event)) return administer(event, identity, content);
         const previous = events.get(identity);
         if (previous !== undefined) {
             if (previous === content)
@@ -161,6 +335,24 @@ export function createScoringEngine(
         if (event.domain === 'observation') {
             remember();
             return result('ignored', 'OBSERVATION_ONLY', identity);
+        }
+        if (event.type === 'gift') {
+            const keys = linkKeys({
+                eventId: event.eventId,
+                actorId: event.actorId ?? '',
+                sequenceId:
+                    event.delivery.kind === 'combo'
+                        ? event.delivery.sequenceId
+                        : null,
+            });
+            if (keys.some((key) => claims.has(key))) {
+                remember();
+                return result(
+                    'rejected',
+                    'MANUAL_RECONCILIATION_REQUIRED',
+                    identity,
+                );
+            }
         }
         let candidate: Candidate | null;
         let points: number;
@@ -313,5 +505,10 @@ export function createScoringEngine(
                     ),
             ),
         });
-    return Object.freeze({ process, snapshot, checkpoint });
+    return Object.freeze({
+        process,
+        snapshot,
+        checkpoint,
+        auditHistory: () => Object.freeze([...operations.values()]),
+    });
 }
