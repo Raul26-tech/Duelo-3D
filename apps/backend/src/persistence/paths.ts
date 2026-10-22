@@ -1,3 +1,4 @@
+import { assertLocalPath } from '../private-files.ts';
 import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import {
@@ -23,9 +24,13 @@ export function resolveDatabasePath(filename: string, create: boolean): string {
         throw new Error(
             'Scoring database path must be absolute and outside the repository',
         );
+    assertLocalPath(filename);
     function canonical(path: string): string {
         if (existsSync(path)) return realpathSync(path);
-        return join(canonical(dirname(path)), basename(path));
+        const parent = dirname(path);
+        if (parent === path)
+            throw new Error('Database drive/root is unavailable');
+        return join(canonical(parent), basename(path));
     }
     const resolved = canonical(resolve(filename));
     const child = relative(repository, resolved);

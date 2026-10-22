@@ -1,3 +1,4 @@
+import { defer, track } from './helpers/resources.ts';
 import { assessRuntimeEvidence } from '../src/catalog-tools/evidence.ts';
 import Database from 'better-sqlite3';
 import test, { type TestContext } from 'node:test';
@@ -70,7 +71,7 @@ function approved() {
 }
 function temp(t: TestContext) {
     const dir = mkdtempSync(join(tmpdir(), 'duelo-experiment-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    defer(t, () => rmSync(dir, { recursive: true, force: true }));
     return dir;
 }
 function env(dir: string): NodeJS.ProcessEnv {
@@ -271,27 +272,36 @@ test('5.6.1: opt-in isolado do catálogo validado; política experimental fica v
         catalog: cfg.gifts.map(({ delivery: _d, ...r }) => r),
         sourcePolicy: cfg.sourcePolicy,
     });
-    const db = openSqliteScoring({
-        filename: c.config.filename,
-        mode: 'create',
-        engine: opts(c.config),
-    });
+    const db = track(
+        t,
+        openSqliteScoring({
+            filename: c.config.filename,
+            mode: 'create',
+            engine: opts(c.config),
+        }),
+    );
     const before = db.snapshot();
     db.close();
     assert.throws(
         () =>
-            openSqliteScoring({
-                filename: c.config.filename,
-                mode: 'resume',
-                engine: opts(prod),
-            }),
+            track(
+                t,
+                openSqliteScoring({
+                    filename: c.config.filename,
+                    mode: 'resume',
+                    engine: opts(prod),
+                }),
+            ),
         /context/,
     );
-    const recovered = openSqliteScoring({
-        filename: c.config.filename,
-        mode: 'resume',
-        engine: opts(c.config),
-    });
+    const recovered = track(
+        t,
+        openSqliteScoring({
+            filename: c.config.filename,
+            mode: 'resume',
+            engine: opts(c.config),
+        }),
+    );
     assert.deepEqual(recovered.snapshot(), before);
     recovered.close();
 });
@@ -336,7 +346,7 @@ async function rig(
         writeDiagnostic,
         afterCommit,
     });
-    t.after(async () => {
+    defer(t, async () => {
         await runtime.close();
         server.close();
     });
@@ -550,7 +560,7 @@ test('5.6.1: rejeição de entrega incompatível não permite combo em regra sin
 });
 test('5.6.1: falha SQLite mantém placar/identidade em rollback e relatório registra falha sem commit', async (t) => {
     const r = await rig(t),
-        db = new Database(r.config.filename);
+        db = track(t, new Database(r.config.filename));
     db.exec(
         "CREATE TRIGGER exp_failure BEFORE UPDATE ON dispute BEGIN SELECT RAISE(ABORT,'synthetic'); END",
     );

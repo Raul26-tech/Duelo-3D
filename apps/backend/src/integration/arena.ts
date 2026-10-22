@@ -106,7 +106,9 @@ export function attachRealArena(
             clearInterval(heartbeat);
             server.off('upgrade', upgrade);
             for (const ws of wss.clients) ws.terminate();
-            wss.close();
+            return new Promise<void>((resolve, reject) => {
+                wss.close((error) => (error ? reject(error) : resolve()));
+            });
         },
     };
 }

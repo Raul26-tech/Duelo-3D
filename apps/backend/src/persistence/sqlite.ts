@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { closeSync, openSync, statSync } from 'node:fs';
+import { closeSync, openSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import type { EngineCheckpoint, ScoringEvent } from '../scoring/contracts.ts';
 import { createScoringEngine, type EngineOptions } from '../scoring/engine.ts';
@@ -88,8 +88,8 @@ class SqliteScoringStore implements ScoringStore {
         }
     }
     private identifyFile() {
-        const stat = statSync(this.filename, { bigint: true });
-        if (stat.nlink !== 1n)
+        const stat = lstatSync(this.filename, { bigint: true });
+        if (!stat.isFile() || stat.nlink !== 1n)
             throw new ScoringIntegrityError(
                 'database aliases/hard links are not supported',
             );

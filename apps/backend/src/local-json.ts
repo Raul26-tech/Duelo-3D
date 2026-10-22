@@ -1,7 +1,7 @@
+import { assertLocalPath, createPrivateFile } from './private-files.ts';
 import {
     readFileSync,
     statSync,
-    openSync,
     closeSync,
     writeFileSync,
     fstatSync,
@@ -31,6 +31,7 @@ export function reserveLocalJson(path: string) {
         throw new Error(
             'Output must be an absolute .json path outside the repository',
         );
+    assertLocalPath(path);
     const filename = join(realpathSync(dirname(path)), basename(path));
     const child = relative(repository, filename);
     if (
@@ -38,7 +39,7 @@ export function reserveLocalJson(path: string) {
         (!child.startsWith('..' + sep) && child !== '..' && !isAbsolute(child))
     )
         throw new Error('Output must be outside the repository and build');
-    const fd = openSync(filename, 'wx', 0o600);
+    const fd = createPrivateFile(filename);
     const identity = fstatSync(fd, { bigint: true });
     let closed = false;
     const ownsPath = () => {
@@ -64,12 +65,9 @@ export function reserveLocalJson(path: string) {
         },
         cancel() {
             if (closed) return;
-            try {
-                if (ownsPath()) unlinkSync(filename);
-            } finally {
-                closeSync(fd);
-                closed = true;
-            }
+            closeSync(fd);
+            closed = true;
+            if (ownsPath()) unlinkSync(filename);
         },
     };
 }

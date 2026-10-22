@@ -25,7 +25,7 @@ printf '%s' "$homologation_password" | npm run admin:credential -- \
 unset homologation_password
 ```
 
-A CLI armazena somente salt/hash scrypt em arquivo 0600. Se já existir uma credencial de teste nesse caminho, reutilize-a conscientemente ou selecione um caminho novo; não apague credenciais para contornar a proteção de sobrescrita.
+A CLI armazena somente salt/hash scrypt em arquivo 0600 no Unix ou com DACL restrita no Windows. O procedimento PowerShell e a validação pendente estão em [windows-compatibility.md](windows-compatibility.md). Se já existir uma credencial de teste nesse caminho, reutilize-a conscientemente ou selecione um caminho novo; não apague credenciais para contornar a proteção de sobrescrita.
 
 ## Iniciar
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import {
     copyFileSync,
     existsSync,
@@ -185,8 +185,22 @@ for (const withEnv of [false, true]) {
             void exit.catch(() => {});
             const kill = (signal: NodeJS.Signals) => {
                 try {
+                    if (child.exitCode !== null || child.signalCode !== null)
+                        return;
                     if (grouped && child.pid) process.kill(-child.pid, signal);
-                    else child.kill(signal);
+                    else if (child.pid) {
+                        // Windows kill(SIGTERM) kills only the watcher, leaving its child.
+                        // This disposable health fixture has no database; terminate the tree.
+                        execFileSync(
+                            join(
+                                process.env.SystemRoot ?? 'C:\\Windows',
+                                'System32',
+                                'taskkill.exe',
+                            ),
+                            ['/PID', String(child.pid), '/T', '/F'],
+                            { stdio: 'ignore', windowsHide: true },
+                        );
+                    }
                 } catch (error) {
                     if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
                         throw error;

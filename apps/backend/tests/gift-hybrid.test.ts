@@ -1,3 +1,4 @@
+import { defer, track } from './helpers/resources.ts';
 import { runCatalogCli } from '../src/catalog-tools/main.ts';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -107,7 +108,7 @@ function occurrence(gifts: readonly ReviewedGift[], data: unknown) {
 }
 function temp(t: TestContext) {
     const directory = mkdtempSync(join(tmpdir(), 'duelo-hybrid-'));
-    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    defer(t, () => rmSync(directory, { recursive: true, force: true }));
     return directory;
 }
 for (const item of reference.filter((gift) => gift.match === 'id')) {
@@ -483,7 +484,7 @@ test('SQLite híbrido: pending, rollback, commit, replay, dedup, fingerprint e r
     const filename = join(temp(t), 'hybrid.sqlite');
     const gifts = active('5576', 'cumulative-final');
     const options = { filename, engine: settings(gifts) };
-    let store = openSqliteScoring({ ...options, mode: 'create' });
+    let store = track(t, openSqliteScoring({ ...options, mode: 'create' }));
     const pending = occurrence(
         gifts,
         raw('Heart', '999', '8001', 1, 0, '10001', USER, true),
@@ -491,13 +492,13 @@ test('SQLite híbrido: pending, rollback, commit, replay, dedup, fingerprint e r
     store.process(pending);
     const before = store.snapshot();
     store.close();
-    store = openSqliteScoring({ ...options, mode: 'resume' });
+    store = track(t, openSqliteScoring({ ...options, mode: 'resume' }));
     assert.deepEqual(store.snapshot(), before);
     const final = occurrence(
         gifts,
         raw('Heart', '888', '8002', 3, 1, '10001', USER, true),
     );
-    const db = new Database(filename);
+    const db = track(t, new Database(filename));
     db.exec(
         "CREATE TRIGGER reject_commit BEFORE UPDATE ON dispute BEGIN SELECT RAISE(ABORT, 'synthetic'); END",
     );
@@ -511,7 +512,7 @@ test('SQLite híbrido: pending, rollback, commit, replay, dedup, fingerprint e r
     assert.equal(store.process(final).points, 60);
     const after = store.snapshot();
     store.close();
-    store = openSqliteScoring({ ...options, mode: 'resume' });
+    store = track(t, openSqliteScoring({ ...options, mode: 'resume' }));
     assert.deepEqual(store.snapshot(), after);
     assert.equal(store.process(final).status, 'duplicate');
     assert.equal(
@@ -542,7 +543,11 @@ test('SQLite híbrido: pending, rollback, commit, replay, dedup, fingerprint e r
         settings(parseReviewedCatalog([{ ...gifts[0], points: 25 }])),
     ])
         assert.throws(
-            () => openSqliteScoring({ filename, engine, mode: 'resume' }),
+            () =>
+                track(
+                    t,
+                    openSqliteScoring({ filename, engine, mode: 'resume' }),
+                ),
             /context/,
         );
     db.exec(
@@ -550,7 +555,7 @@ test('SQLite híbrido: pending, rollback, commit, replay, dedup, fingerprint e r
     );
     db.close();
     assert.throws(
-        () => openSqliteScoring({ ...options, mode: 'resume' }),
+        () => track(t, openSqliteScoring({ ...options, mode: 'resume' })),
         /digest/,
     );
 });
@@ -572,7 +577,7 @@ test('catálogo legado de quatro presentes preserva configuração, fingerprint 
     assert.ok(gifts.every((gift) => !Object.hasOwn(gift, 'match')));
     const filename = join(temp(t), 'legacy.sqlite');
     const options = { filename, engine: settings(gifts) };
-    let store = openSqliteScoring({ ...options, mode: 'create' });
+    let store = track(t, openSqliteScoring({ ...options, mode: 'create' }));
     for (const [index, gift] of gifts.entries())
         store.process(
             occurrence(
@@ -582,7 +587,7 @@ test('catálogo legado de quatro presentes preserva configuração, fingerprint 
         );
     const before = store.snapshot();
     store.close();
-    store = openSqliteScoring({ ...options, mode: 'resume' });
+    store = track(t, openSqliteScoring({ ...options, mode: 'resume' }));
     assert.deepEqual(store.snapshot(), before);
     assert.equal(before.scores.lula, 12);
     assert.equal(before.scores.flavio, 70);
@@ -655,7 +660,7 @@ test('WebSocket híbrido: publica depois do commit, falha de publicação recupe
         },
         afterCommit(decision) {
             if (decision.status !== 'applied') return;
-            const db = new Database(filename);
+            const db = track(t, new Database(filename));
             assert.equal(
                 (
                     db.prepare('SELECT version FROM dispute').get() as {
@@ -669,7 +674,7 @@ test('WebSocket híbrido: publica depois do commit, falha de publicação recupe
         },
     });
     const viewers: WebSocket[] = [];
-    t.after(async () => {
+    defer(t, async () => {
         for (const ws of viewers) ws.terminate();
         await runtime.close();
         await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -745,7 +750,7 @@ test('fixture capturada do motor anterior: replay v2 e combo pendente mantêm se
     const cp = fixture.checkpoint,
         cfg = cp.configuration,
         state = cp.state;
-    const db = new Database(filename);
+    const db = track(t, new Database(filename));
     // Import only the existing schema; no runtime migration or new table.
     db.pragma('journal_mode=WAL');
     db.pragma('foreign_keys=ON');
@@ -795,11 +800,14 @@ test('fixture capturada do motor anterior: replay v2 e combo pendente mantêm se
             );
     })();
     db.close();
-    const store = openSqliteScoring({
-        filename,
-        mode: 'resume',
-        engine: fixture.options,
-    });
+    const store = track(
+        t,
+        openSqliteScoring({
+            filename,
+            mode: 'resume',
+            engine: fixture.options,
+        }),
+    );
     try {
         assert.deepEqual(store.snapshot(), state);
         assert.equal(store.process(fixture.journal[1]).status, 'duplicate');
@@ -825,11 +833,11 @@ test('SQLite rejeita alteração de identidade/regra mesmo com ID externo real p
     const gifts = active('5576');
     const filename = join(temp(t), 'identities.sqlite'),
         options = { filename, engine: settings(gifts) };
-    let store = openSqliteScoring({ ...options, mode: 'create' });
+    let store = track(t, openSqliteScoring({ ...options, mode: 'create' }));
     const event = occurrence(gifts, raw('Heart'));
     assert.equal(store.process(event).points, 20);
     store.close();
-    store = openSqliteScoring({ ...options, mode: 'resume' });
+    store = track(t, openSqliteScoring({ ...options, mode: 'resume' }));
     try {
         assert.equal(
             store.process({ ...event, giftRuleId: 'name:galaxy' }).reason,
@@ -884,7 +892,7 @@ test('SQLite híbrido: overflow preserva sequência pendente e capacidade não d
     ]);
     const filename = join(temp(t), 'overflow.sqlite');
     const options = { filename, engine: settings(gifts) };
-    const store = openSqliteScoring({ ...options, mode: 'create' });
+    const store = track(t, openSqliteScoring({ ...options, mode: 'create' }));
     try {
         const pending = occurrence(
             gifts,
@@ -902,7 +910,7 @@ test('SQLite híbrido: overflow preserva sequência pendente e capacidade não d
             'SCORE_LIMIT',
         );
         assert.deepEqual(store.snapshot(), before);
-        const db = new Database(filename);
+        const db = track(t, new Database(filename));
         assert.equal(
             (
                 db.prepare('SELECT count(*) n FROM journal').get() as {
@@ -963,7 +971,7 @@ test('legado: contradição de nome recebida é persistida, não pode reaparecer
     ]);
     const filename = join(temp(t), 'legacy-conflict.sqlite'),
         options = { filename, engine: settings(gifts) };
-    let store = openSqliteScoring({ ...options, mode: 'create' });
+    let store = track(t, openSqliteScoring({ ...options, mode: 'create' }));
     store.process(
         occurrence(
             gifts,
@@ -980,7 +988,7 @@ test('legado: contradição de nome recebida é persistida, não pode reaparecer
         'ID_NAME_CONFLICT',
     );
     store.close();
-    store = openSqliteScoring({ ...options, mode: 'resume' });
+    store = track(t, openSqliteScoring({ ...options, mode: 'resume' }));
     try {
         assert.equal(
             store.process(

@@ -29,6 +29,9 @@ export async function runHomologation(args = process.argv.slice(2)) {
                 const application = await startup;
                 await application.close();
             } finally {
+                // A paused pipe can still own an OS handle. Release the CLI's input
+                // after closing the application; never force process.exit().
+                if (!process.stdin.isTTY) process.stdin.destroy();
                 removeSignals();
             }
         })();

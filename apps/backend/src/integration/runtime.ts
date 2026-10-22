@@ -252,11 +252,23 @@ export function startRealRuntime(options: {
                 closing = (async () => {
                     clearInterval(tick);
                     flushSuppressed();
-                    arena.close();
-                    await client.stop();
-                    diagnostic?.finish('operator_stop');
-                    storage.close();
-                    release();
+                    try {
+                        try {
+                            await arena.close();
+                        } finally {
+                            await client.stop();
+                        }
+                    } finally {
+                        try {
+                            diagnostic?.finish('operator_stop');
+                        } finally {
+                            try {
+                                storage.close();
+                            } finally {
+                                release();
+                            }
+                        }
+                    }
                 })();
             return closing;
         },
