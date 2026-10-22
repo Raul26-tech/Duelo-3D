@@ -179,6 +179,15 @@ export function assertPrivateFile(path: string) {
     else if ((stat.mode & 0o077) !== 0)
         throw new Error('Private file requires POSIX 0600');
 }
+/** Verify the private parent ACL without relying on emulated POSIX bits on Windows. */
+export function assertPrivateDirectory(path: string) {
+    assertPathComponents(path);
+    const stat = lstatSync(path);
+    if (!stat.isDirectory()) throw new Error('Private directory required');
+    if (process.platform === 'win32') windowsFile('verify', path);
+    else if ((stat.mode & 0o777) !== 0o700)
+        throw new Error('Private directory requires POSIX 0700');
+}
 /** Only for a newly allocated, owned temporary directory; never an operator directory. */
 export function protectTemporaryDirectory(path: string) {
     assertPathComponents(path);

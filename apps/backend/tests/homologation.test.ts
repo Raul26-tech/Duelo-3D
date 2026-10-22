@@ -1,6 +1,9 @@
 import { npmArguments } from './helpers/platform.ts';
 import { writeNewLocalJson } from '../src/local-json.ts';
-import { assertPrivateFile } from '../src/private-files.ts';
+import {
+    assertPrivateFile,
+    assertPrivateDirectory,
+} from '../src/private-files.ts';
 import { defer, track } from './helpers/resources.ts';
 import test, { before, after, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +20,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { request, createServer } from 'node:http';
 import { once } from 'node:events';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomUUID, createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { WebSocket } from 'ws';
@@ -30,6 +33,53 @@ import {
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const password = 'synthetic-homologation-password-only';
+const HTTP_TIMEOUT = 5000;
+const CLI_PHASE_TIMEOUT = 15000;
+const CLI_CLOSE_TIMEOUT = 5000;
+// Startup + recovery + seven HTTP requests + complete process/stdio shutdown.
+// Each phase still fails at its own deadline; this is not an unconditional wait.
+const CLI_TEST_TIMEOUT =
+    2 * CLI_PHASE_TIMEOUT + 7 * HTTP_TIMEOUT + CLI_CLOSE_TIMEOUT;
+
+function waitForCliOutput(
+    child: ChildProcess,
+    output: () => string,
+    expected: string,
+    stage: string,
+) {
+    return new Promise<void>((resolve, reject) => {
+        const finish = (error?: Error) => {
+            clearTimeout(timer);
+            child.stdout!.off('data', check);
+            child.off('exit', exited);
+            child.off('error', failed);
+            if (error) reject(error);
+            else resolve();
+        };
+        const check = () => {
+            if (output().includes(expected)) finish();
+        };
+        const exited = () =>
+            finish(new Error(`CLI encerrou na etapa ${stage}: ${output()}`));
+        const failed = () =>
+            finish(new Error(`Falha ao executar CLI na etapa ${stage}`));
+        const timer = setTimeout(
+            () =>
+                finish(
+                    new Error(
+                        `CLI excedeu prazo da etapa ${stage}: ${output()}`,
+                    ),
+                ),
+            CLI_PHASE_TIMEOUT,
+        );
+        child.stdout!.on('data', check);
+        child.once('exit', exited);
+        child.once('error', failed);
+        if (output().includes(expected)) finish();
+        else if (child.exitCode !== null || child.signalCode !== null) exited();
+    });
+}
+
 let directory: string, credentialFile: string;
 before(() => {
     process.env.NODE_ENV = 'test';
@@ -84,7 +134,9 @@ function http(
                 res.on('error', reject);
             },
         );
-        req.setTimeout(5000, () => req.destroy(new Error('HTTP timeout')));
+        req.setTimeout(HTTP_TIMEOUT, () =>
+            req.destroy(new Error('HTTP timeout')),
+        );
         req.on('error', reject);
         req.end(body === undefined ? undefined : JSON.stringify(body));
     });
@@ -169,9 +221,9 @@ test('homologação: rejeita ausência de consentimento e configurações operac
     await assert.rejects(
         startAdministrationHomologation({
             isolated: true,
-            credentialFile: '/absent-test-credential',
+            credentialFile: join(directory, 'absent-test-credential.json'),
         }),
-        /ENOENT/,
+        { code: 'ENOENT' },
     );
 });
 
@@ -197,10 +249,12 @@ test('homologação: banco temporário privado, autoridade isolada e limpeza ide
     assert.equal(relative(app.directory, app.filename), 'homologation.sqlite');
     assert.equal(app.filename, join(app.directory, 'homologation.sqlite'));
     assert.ok(!app.directory.startsWith(root));
-    if (process.platform !== 'win32')
-        assert.equal(statSync(app.directory).mode & 0o777, 0o700);
+    assertPrivateDirectory(app.directory);
     assertPrivateFile(credentialFile);
-    assert.equal(statSync(app.filename).mode & 0o077, 0);
+    // SQLite inherits the protected parent DACL on Windows. Its mode is emulated;
+    // 0666 & 0077 is 54, which is not a score or evidence of effective ACL rights.
+    if (process.platform !== 'win32')
+        assert.equal(statSync(app.filename).mode & 0o077, 0);
     assert.ok(
         !app.filename.includes('live-fase54-tuneldotempodjtim-01.sqlite'),
     );
@@ -437,17 +491,21 @@ test('homologação: porta ocupada falha sem alternar portas nem deixar autorida
     );
 });
 
-test(
-    'homologação CLI: nenhum SDK/env/rede de saída; credencial explícita, recuperação e encerramento (SIGINT Unix/q Windows) limpam banco/portas',
-    { timeout: 30000 },
-    async (t) => {
-        const cli = new URL('../src/admin/homologation-cli.ts', import.meta.url)
-            .href;
-        // Guard the actual entrypoint for its whole lifetime, including recovery.
-        const code = `
+for (const shutdownMode of ['console', 'pipe'] as const)
+    test(
+        `homologação CLI (${shutdownMode}): sem SDK/env/rede de saída; recuperação e encerramento liberam banco, portas e stdin`,
+        { timeout: CLI_TEST_TIMEOUT },
+        async (t) => {
+            const cli = new URL(
+                '../src/admin/homologation-cli.ts',
+                import.meta.url,
+            ).href;
+            // Guard the actual entrypoint for its whole lifetime, including recovery.
+            const code = `
         import { Socket } from 'node:net';
         import { registerHooks } from 'node:module';
-        void process.stdout; void process.stderr;
+        void process.stdout; void process.stderr; void process.stdin;
+        process.stdin.once('close', () => console.log('HOMOLOGATION_STDIN_CLOSED'));
         Socket.prototype.connect = function() { throw new Error('OUTBOUND_FORBIDDEN'); };
         process.loadEnvFile = () => { throw new Error('ENV_FORBIDDEN'); };
         globalThis.fetch = () => { throw new Error('OUTBOUND_FORBIDDEN'); };
@@ -455,62 +513,77 @@ test(
         const { runHomologation } = await import(${JSON.stringify(cli)});
         await runHomologation(['--isolated', '--credential', ${JSON.stringify(credentialFile)}]);
     `;
-        const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: '1' };
-        delete env.FORCE_COLOR;
-        const child = spawn(
-            process.execPath,
-            ['--input-type=module', '-e', code],
-            { cwd: tmpdir(), env, stdio: ['pipe', 'pipe', 'pipe'] },
-        );
-        let output = '',
-            errors = '';
-        child.stdout.on('data', (data) => {
-            output += data.toString();
-        });
-        child.stderr.on('data', (data) => {
-            errors += data.toString();
-        });
-        defer(t, async () => {
-            if (child.exitCode === null && child.signalCode === null) {
-                const exited = once(child, 'exit');
-                child.kill('SIGKILL');
-                await exited;
-            }
-        });
-        const waitFor = async (text: string) => {
-            const until = Date.now() + 15000;
-            while (!output.includes(text)) {
-                if (child.exitCode !== null || Date.now() > until)
-                    assert.fail('CLI não disponível: ' + output + errors);
-                await new Promise((resolve) => setTimeout(resolve, 20));
-            }
-        };
-        await waitFor('r + Enter');
-        assert.ok(output.includes('http://127.0.0.2:3001/admin/'));
-        assert.ok(output.includes('http://127.0.0.1:5173/'));
-        const temporary = output.match(/Banco descartável: (.+)/u)![1].trim();
-        const api = await authenticated('http://127.0.0.2:3001/admin/');
-        const state = JSON.parse((await api('state')).text);
-        await api('award', award(state.state.sessionId));
-        child.stdin.write('r\n');
-        await waitFor('Recuperação concluída');
-        const next = await authenticated('http://127.0.0.2:3001/admin/');
-        assert.equal(
-            JSON.parse((await next('state')).text).state.scores.lula,
-            26,
-        );
-        const exited = once(child, 'exit');
-        if (process.platform === 'win32') child.stdin.write('q\n');
-        else child.kill('SIGINT');
-        assert.equal((await exited)[0], 0, errors);
-        assert.equal(existsSync(temporary), false);
-        await assert.rejects(http('http://127.0.0.2:3001/admin/'));
-        await assert.rejects(http('http://127.0.0.1:5173/health'));
-        assert.ok(!output.includes(password));
-        assert.ok(!output.includes('duelo_admin='));
-        assert.ok(!errors.includes('FORBIDDEN'), errors);
-    },
-);
+            const env: NodeJS.ProcessEnv = { ...process.env, NO_COLOR: '1' };
+            delete env.FORCE_COLOR;
+            const child = spawn(
+                process.execPath,
+                ['--input-type=module', '-e', code],
+                { cwd: tmpdir(), env, stdio: ['pipe', 'pipe', 'pipe'] },
+            );
+            let output = '',
+                errors = '';
+            child.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+            child.stderr.on('data', (data) => {
+                errors += data.toString();
+            });
+            defer(t, async () => {
+                if (child.exitCode === null && child.signalCode === null) {
+                    const exited = once(child, 'close');
+                    child.kill('SIGKILL');
+                    await exited;
+                }
+            });
+            await waitForCliOutput(
+                child,
+                () => output + errors,
+                'r + Enter',
+                'startup',
+            );
+            assert.ok(output.includes('http://127.0.0.2:3001/admin/'));
+            assert.ok(output.includes('http://127.0.0.1:5173/'));
+            const temporary = output
+                .match(/Banco descartável: (.+)/u)![1]
+                .trim();
+            const api = await authenticated('http://127.0.0.2:3001/admin/');
+            const state = JSON.parse((await api('state')).text);
+            await api('award', award(state.state.sessionId));
+            child.stdin.write('r\n');
+            await waitForCliOutput(
+                child,
+                () => output + errors,
+                'Recuperação concluída',
+                'recovery',
+            );
+            const next = await authenticated('http://127.0.0.2:3001/admin/');
+            assert.equal(
+                JSON.parse((await next('state')).text).state.scores.lula,
+                26,
+            );
+            const closed = once(child, 'close', {
+                signal: AbortSignal.timeout(CLI_CLOSE_TIMEOUT),
+            });
+            if (shutdownMode === 'pipe') child.stdin.end('q\n');
+            else if (process.platform === 'win32') child.stdin.write('q\n');
+            else child.kill('SIGINT');
+            const [exitCode] = await closed.catch(() => {
+                throw new Error(
+                    'CLI não encerrou processo/stdio na etapa shutdown: ' +
+                        output +
+                        errors,
+                );
+            });
+            assert.equal(exitCode, 0, errors);
+            assert.ok(output.includes('HOMOLOGATION_STDIN_CLOSED'));
+            assert.equal(existsSync(temporary), false);
+            await assert.rejects(http('http://127.0.0.2:3001/admin/'));
+            await assert.rejects(http('http://127.0.0.1:5173/health'));
+            assert.ok(!output.includes(password));
+            assert.ok(!output.includes('duelo_admin='));
+            assert.ok(!errors.includes('FORBIDDEN'), errors);
+        },
+    );
 
 test(
     'homologação: comando npm raiz encerra todo o grupo por SIGINT e limpa o SQLite',

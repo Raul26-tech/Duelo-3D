@@ -27,6 +27,8 @@ import { makePublicFixture } from './helpers/platform.ts';
 import {
     assertLocalPath,
     assertPrivateFile,
+    assertPrivateDirectory,
+    protectTemporaryDirectory,
     createPrivateFile,
     isLocalAbsolutePath,
 } from '../src/private-files.ts';
@@ -342,4 +344,17 @@ test('teardown propaga falhas e ainda encerra os recursos restantes', () => {
     assert.equal(result.status, 1);
     assert.match(result.stdout + result.stderr, /Resource teardown failed/);
     assert.match(result.stdout + result.stderr, /REMAINING_RESOURCE_CLOSED/);
+});
+
+test('diretório de homologação: verifica ACL/0700 sem alterar permissões e recusa acesso público', (t) => {
+    const dir = temporary(t),
+        privateDir = join(dir, 'private');
+    mkdirSync(privateDir);
+    protectTemporaryDirectory(privateDir);
+    assertPrivateDirectory(privateDir);
+    if (process.platform === 'win32') makePublicFixture(privateDir);
+    else chmodSync(privateDir, 0o755);
+    assert.throws(() => assertPrivateDirectory(privateDir));
+    // Credential policy is still strict: directory verification never grants file access.
+    assert.throws(() => assertPrivateFile(privateDir), /regular/);
 });

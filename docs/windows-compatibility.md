@@ -125,3 +125,79 @@ Este ambiente Work **não disponibiliza Windows**. Não foram executados PowerSh
 Os testes adicionados cobrem sintaxe Windows, caminhos com espaços/Unicode, criação exclusiva e cancelamento de arquivos, credenciais e ACL insegura/herdada (ramo nativo quando no Windows), aliases por hard link/junction, isolamento do repositório, teardown LIFO, rollback, recuperação/dedup e remoção após fechamento. Os testes anteriores continuam cobrindo login/logout/CSRF, lançamentos, correções/estornos, auditoria/replay legado e catálogo experimental.
 
 Não houve conexão TikTok, LIVE, disputa operacional criada, alteração em `.env`, catálogo privado, credencial existente ou banco histórico. Os 14 presentes, políticas de entrega, manifestos e limite de 35 minutos foram preservados. Não houve migração de schema nem mudança em HTML, CSS, frontend, vídeos ou pontuação.
+
+## Complemento de homologação nativa — PR #13
+
+O operador executou o commit `0f10539937f073c953a806f0d14eca83c41e3daf` em **Windows 10, Node 24.22.0, npm 11.19.1**, em worktree isolado, sem `.env` operacional e sem TikTok. Resultado informado: frontend **26/26**; backend **329 aprovados, quatro falhas, um cancelamento e um ignorado**. Isso não equivale à aprovação integral Windows.
+
+As pendências foram analisadas separadamente:
+
+| Pendência                          | Causa identificada e ajuste                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pré-condições esperavam ENOENT     | A fixture `/absent-test-credential` era inválida como caminho absoluto local Windows. Agora usa `join` dentro do diretório temporário real e exige o código `ENOENT`, sem afrouxar a validação de caminhos.                                                                                                                                                                                                                                                 |
+| Banco temporário: 54 em vez de 0   | A asserção verificava `stat.mode & 0o077`; `0666 & 0077` resulta em **54 decimal** no modo emulado Windows. Não era pontuação do SQLite. O teste verifica a DACL protegida do diretório temporário; a regra POSIX do arquivo continua verificada no Unix. O verificador de diretório também rejeita acesso público e não altera ACLs. A política de credenciais continua exigindo arquivo com DACL própria protegida.                                       |
+| Dois testes de configuração TikTok | Usavam `/tmp/synthetic-real.sqlite`, independente do SO. Agora usam caminho nativo em fixture temporária. A configuração de produção continua recusando caminhos relativos, dispositivos, ADS e contextos indevidos. Nenhuma conexão ou banco operacional é criado por esses testes de configuração.                                                                                                                                                        |
+| Cancelamento da CLI                | Havia espera de saída sem prazo próprio, pipe de entrada sem fechamento explícito e limite externo de 30 s menor que a soma dos limites das etapas. A CLI agora destrói somente sua entrada não interativa após encerrar a aplicação, sem `process.exit`. Testes aguardam `close` (processo e stdio), verificam fechamento de stdin e exercitam `q` com pipe aberto e `q` seguido de EOF no Windows; no Unix preservam SIGINT e acrescentam o caso de pipe. |
+
+O orçamento da CLI passa a ser derivado: início **15 s**, recuperação **15 s**, sete requisições HTTP de até **5 s** e fechamento de processo/stdio **5 s**, total externo **70 s**. Cada etapa falha no seu prazo e informa `startup`, `recovery` ou `shutdown`; não há espera fixa adicional nem aumento ilimitado de timeout. Os 30 s e a gestão dos handles eram problemas verificáveis no teste/código. **Sem o trace detalhado ou reprodução Windows neste Work, não é possível atribuir com certeza o cancelamento nativo a apenas uma dessas causas.**
+
+A nova verificação de diretório é exclusivamente de leitura; mantém a mesma DACL exigida para a pasta recém-criada da homologação. SQLite, catálogo, manifesto, motor e credenciais operacionais não são alterados. Os testes específicos de segurança permanecem ativos.
+
+### LF no checkout Windows
+
+O operador confirmou `core.autocrlf=true` e `i/lf w/crlf`. Em um novo worktree com LF, `C:\Users\carin\Documents\Duelo-3D-windows-lf`, confirmou `i/lf w/lf` e **Prettier aprovado**. Portanto, os 134 apontamentos anteriores eram efeito do checkout, e foram resolvidos **sem formatar esses arquivos ou alterar o código**.
+
+Não altere a configuração global do Git nem rode formatação geral para corrigir conversão de checkout. Para atualizar o worktree LF existente, primeiro confira e preserve qualquer alteração local; prossiga com a troca somente se o checkout estiver limpo:
+
+```powershell
+Set-Location C:\Users\carin\Documents\Duelo-3D-windows-lf
+git status --short
+git fetch origin
+git -c core.autocrlf=false -c core.eol=lf switch --detach origin/fix/windows-compatibility
+git ls-files --eol -- apps/backend/tests/homologation.test.ts apps/backend/tests/tiktok-scoring.test.ts docs/windows-compatibility.md
+```
+
+Espere `i/lf w/lf` nos arquivos de texto. As opções `-c` valem somente para essa operação, sem mudar outros worktrees ou configuração global. Repita ambas em operações futuras que façam checkout. `core.eol=lf` sozinho não basta se `core.autocrlf=true` estiver ativo. Isso não reconverte automaticamente arquivos inalterados que já estavam CRLF: preserve o worktree LF confirmado; se precisar de outro, crie um diretório novo, sem apagar ou resetar trabalhos existentes:
+
+```powershell
+# Executar no clone; escolher um destino ainda inexistente.
+git -c core.autocrlf=false -c core.eol=lf worktree add --detach ..\Duelo-3D-windows-final origin/fix/windows-compatibility
+```
+
+Referências: [opções core.autocrlf/core.eol do Git](https://git-scm.com/docs/git-config), [evento close do ChildProcess](https://nodejs.org/docs/latest-v24.x/api/child_process.html#event-close).
+
+### Revalidação no notebook
+
+No worktree LF atualizado, mantenha o terminal isolado conforme a verificação de ambiente descrita acima. Não copie `.env`, bancos, credenciais ou catálogos operacionais. Os testes de homologação criam a própria credencial sintética privada e removem os bancos descartáveis; não exigem a credencial de teste visual já existente.
+
+```powershell
+node --version
+npm.cmd --version
+npm.cmd ci
+
+# Homologação administrativa completa, incluindo CLI/recuperação/encerramento.
+npm.cmd exec --workspace backend -- node --test tests/homologation.test.ts
+
+# Somente os dois testes de configuração TikTok, sem conectar ao provedor.
+npm.cmd exec --workspace backend -- node --test --test-name-pattern="^config:" tests/tiktok-scoring.test.ts
+
+# Opcional: arquivo completo de integração com provedor falso e segurança de arquivos.
+npm.cmd exec --workspace backend -- node --test tests/tiktok-scoring.test.ts tests/windows-compatibility.test.ts
+
+# Validação integral.
+npm.cmd run build
+npm.cmd run build:homologation
+npm.cmd test
+npm.cmd run check:media
+npm.cmd run format:check
+```
+
+Conferir `$LASTEXITCODE` após cada comando e guardar o resumo integral, incluindo cancelamentos. Se a CLI ainda falhar, registrar a etapa indicada e o erro completo do teste sintético, sem anexar credenciais, `.env` ou dados operacionais. O teste de grupo POSIX permanece ignorado no Windows como antes; não houve nova exclusão de testes.
+
+O checklist visual anterior continua aplicável: painel e arena sintéticos, login/logout, lançamento/estorno/correção, recuperação por `r`, encerramento por `q` e Ctrl+C real. Não executar essa conferência usando a disputa ou credencial operacional. A nova revisão ainda precisa da última homologação Windows do operador.
+
+### Validação executada neste complemento
+
+Linux, **Node 24.15.0 / npm 11.9.0**: `npm ci`, `npm audit` (zero vulnerabilidades reportadas), `npm run build`, `npm run build:homologation`, `npm run check:media` (seis WebM) e `npm run format:check` aprovados. Suíte completa: **363/363** — 26 frontend + 337 backend; zero falhas, cancelamentos ou testes ignorados no Linux. Testes focados da homologação: **10/10**; configuração TikTok por padrão de nome: **2/2**. Também foi executado o conjunto de três arquivos homologation/tiktok-scoring/windows-compatibility: **49/49**.
+
+Dois casos novos em relação ao commit anterior: encerramento da CLI por `q` com EOF e verificação de diretório privado/rejeição de acesso público. Os demais cenários foram preservados e corrigidos; nenhum teste foi excluído ou passou a ser ignorado. A suíte Windows desta nova revisão ainda **não foi executada neste Work**. Os resultados Windows citados acima são exclusivamente os informados pelo operador para a revisão anterior.

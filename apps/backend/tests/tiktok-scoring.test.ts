@@ -493,7 +493,9 @@ test('real: overflow não grava identidade, sequência final ou placar parcial',
     assert.equal(r.current().snapshot().scores.lula, 0);
 });
 
-test('config: real exige adesão explícita, identidade revisada e ação create/resume; padrão simulação', () => {
+test('config: real exige adesão explícita, identidade revisada e ação create/resume; padrão simulação', (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'duelo-config-'));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
     assert.equal(readOperationMode({}), 'simulation');
     for (const env of [
         {},
@@ -508,7 +510,7 @@ test('config: real exige adesão explícita, identidade revisada e ação create
         TIKTOK_USERNAME: 'synthetic_test',
         TIKTOK_ROOM_ID: ROOM,
         TIKTOK_SESSION_ACTION: 'resume',
-        TIKTOK_DATABASE: '/tmp/synthetic-real.sqlite',
+        TIKTOK_DATABASE: join(directory, 'synthetic-real.sqlite'),
     };
     assert.equal(readRealConfig(env).gifts.length, 0);
     for (const changes of [
@@ -533,7 +535,7 @@ test('config: catálogo externo validado, imutável e política de retomada vinc
         TIKTOK_USERNAME: 'synthetic_test',
         TIKTOK_ROOM_ID: ROOM,
         TIKTOK_SESSION_ACTION: 'create',
-        TIKTOK_DATABASE: '/tmp/synthetic-real.sqlite',
+        TIKTOK_DATABASE: join(directory, 'synthetic-real.sqlite'),
         TIKTOK_GIFT_CATALOG: path,
     };
     const first = readRealConfig(env);
